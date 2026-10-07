@@ -1,0 +1,3186 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Redline Diff Inspector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: three-pane workbench — preset rail · stage on a cutting-mat grid · inspector; benchmark and method below. */
+:root {
+  --bg: #E2E5E9;
+  --panel: #F5F6F8;
+  --raised: #FFFFFF;
+  --ink: #0F1318;
+  --ink-2: #47505D;
+  --muted: #6E7887;
+  --line: #C9CFD7;
+  --line-2: #DADEE4;
+  --mat: #D6DAE0;
+  --mat-dot: #BFC5CE;
+  --accent: #006D92;
+  --accent-wash: rgba(0, 109, 146, 0.10);
+  --plate-d: #0089BA;
+  --plate-m: #C2187A;
+  --sev-major: #D03B3B;
+  --sev-minor: #E39400;
+  --sev-ok: #0CA30C;
+  --shadow: 0 1px 2px rgba(15, 19, 24, 0.06), 0 4px 16px rgba(15, 19, 24, 0.06);
+  --font-ui: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C0F12; --panel: #13171C; --raised: #191E24; --ink: #E6EAEF; --ink-2: #A8B1BD; --muted: #7D8797;
+    --line: #29313A; --line-2: #20262E; --mat: #090B0E; --mat-dot: #1B2128; --accent: #3DB6E0; --accent-wash: rgba(61, 182, 224, 0.12);
+    --plate-d: #35B4E0; --plate-m: #E2509E; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C0F12; --panel: #13171C; --raised: #191E24; --ink: #E6EAEF; --ink-2: #A8B1BD; --muted: #7D8797;
+  --line: #29313A; --line-2: #20262E; --mat: #090B0E; --mat-dot: #1B2128; --accent: #3DB6E0; --accent-wash: rgba(61, 182, 224, 0.12);
+  --plate-d: #35B4E0; --plate-m: #E2509E; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35); color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body { margin: 0; color: var(--ink); font: 14px/1.45 var(--font-ui); font-variation-settings: 'wdth' 100; -webkit-font-smoothing: antialiased; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.wrap { padding-inline: 16px; padding-block: 12px 40px; max-width: 1680px; margin: 0 auto; }
+
+/* ---------- header ---------- */
+.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-block: 6px 12px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { flex: none; }
+.brand h1 { margin: 0; font-size: 20px; line-height: 1; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; font-variation-settings: 'wdth' 72; }
+.brand p { margin: 0; color: var(--muted); font: 12px/1.3 var(--font-mono); }
+.top .spacer { flex: 1; }
+.top .note { color: var(--muted); font-size: 12.5px; max-width: 52ch; text-wrap: balance; }
+
+/* ---------- controls ---------- */
+.controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > span, .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sel { position: relative; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
+.sel i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.sel select { appearance: none; border: 0; background: transparent; padding: 0 18px 0 0; height: 32px; min-width: 0; max-width: 260px; outline: none; cursor: pointer; }
+.sel:after { content: ""; position: absolute; right: 10px; top: 13px; width: 6px; height: 6px; border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2); transform: rotate(45deg); pointer-events: none; }
+.sel:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); }
+.chip { height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.chip:hover { background: var(--accent-wash); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
+.chip .fam { opacity: 0.6; font: 10px var(--font-mono); margin-left: 4px; }
+.btn { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); font-size: 13px; font-weight: 600; }
+.btn:hover { border-color: var(--ink-2); }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.solid { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn.solid { color: #061218; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.solid { color: #061218; } }
+.btn.ghost { border-color: transparent; background: transparent; }
+.ctl-end { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- drawer (tune / source) ---------- */
+.drawer { margin-top: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; }
+.tune { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 22px; }
+.tune h4 { grid-column: 1 / -1; margin: 4px 0 -4px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.slider { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; }
+.slider label { font-size: 13px; color: var(--ink-2); }
+.slider output { font: 12px var(--font-mono); color: var(--ink); }
+.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.slider small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; line-height: 1.3; }
+.toggles { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.toggles label { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.toggles input { accent-color: var(--accent); }
+.src { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.src textarea { width: 100%; height: 280px; resize: vertical; padding: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); font: 12px/1.45 var(--font-mono); white-space: pre; tab-size: 2; }
+.src .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.src .hint { color: var(--muted); font-size: 12px; }
+@media (max-width: 760px) { .src { grid-template-columns: 1fr; } }
+
+/* ---------- workbench ---------- */
+.bench { display: grid; grid-template-columns: 236px minmax(0, 1fr) 372px; gap: 12px; margin-top: 12px; align-items: start; }
+@media (max-width: 1240px) { .bench { grid-template-columns: minmax(0, 1fr) 340px; } .rail { grid-column: 1 / -1; order: 3; } }
+@media (max-width: 880px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.pane { background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; min-width: 0; }
+.pane-h { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line-2); min-height: 44px; flex-wrap: wrap; }
+.pane-h h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.pane-h .grow { flex: 1; }
+
+/* rail */
+.rail .list { display: flex; flex-direction: column; gap: 6px; padding: 8px; max-height: calc(100vh - 220px); overflow: auto; }
+@media (max-width: 1240px) { .rail .list { flex-direction: row; overflow-x: auto; max-height: none; } .preset { width: 210px; flex: none; } }
+.preset { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 10px; align-items: center; width: 100%; padding: 6px; text-align: left; border: 1px solid transparent; border-radius: 10px; background: transparent; }
+.preset:hover { background: var(--raised); border-color: var(--line-2); }
+.preset[aria-current="true"] { background: var(--raised); border-color: var(--ink-2); box-shadow: var(--shadow); }
+.preset .th { grid-row: span 2; width: 64px; height: 48px; border-radius: 6px; background: var(--mat); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.preset .th canvas { max-width: 100%; max-height: 100%; display: block; }
+.preset .t { font-size: 13px; font-weight: 600; line-height: 1.25; text-wrap: balance; }
+.preset .s { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.tag { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line); font: 10.5px var(--font-mono); color: var(--ink-2); white-space: nowrap; }
+.rail .foot { padding: 8px 12px 12px; border-top: 1px solid var(--line-2); color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+/* stage */
+.stage .views { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--raised); flex-wrap: wrap; }
+.stage .views button { height: 26px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; font-size: 12.5px; color: var(--ink-2); }
+.stage .views button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
+.opt { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.opt input { accent-color: var(--accent); }
+.busy { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; visibility: hidden; }
+.busy.on { visibility: visible; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .busy { animation-duration: 3s; } }
+.mat { position: relative; padding: 18px; background-color: var(--mat); background-image: radial-gradient(var(--mat-dot) 1px, transparent 1.2px); background-size: 16px 16px; border-radius: 0 0 12px 12px; min-height: 360px; overflow: auto; }
+.mat.dim > * { opacity: 0.55; transition: opacity .2s; }
+.frames { display: flex; gap: 18px; justify-content: center; align-items: flex-start; }
+.frames.two > .fr { flex: 1 1 0; min-width: 0; }
+.fr { position: relative; min-width: 0; max-width: 100%; }
+.fr .cap { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font: 11px var(--font-mono); color: var(--ink-2); }
+.fr .cap i { width: 8px; height: 8px; border-radius: 2px; }
+.canvasbox { position: relative; width: 100%; background: #fff; box-shadow: 0 0 0 1px rgba(15,19,24,.12), 0 8px 30px rgba(15,19,24,.14); }
+.canvasbox > canvas { display: block; width: 100%; height: auto; }
+.canvasbox > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.canvasbox .layer { position: absolute; inset: 0; }
+.canvasbox .layer canvas { width: 100%; height: 100%; display: block; }
+svg .hit { cursor: pointer; }
+svg .hit:hover .box, svg .hit.hl .box { stroke-width: 3.5; }
+.swipe { display: flex; align-items: center; gap: 10px; margin: 0 auto 10px; max-width: 520px; font: 11px var(--font-mono); color: var(--ink-2); }
+.swipe input { flex: 1; accent-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 12px; border-top: 1px solid var(--line-2); font-size: 12px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 10px; border-radius: 2px; border: 2px solid; display: inline-block; }
+.legend i.dash { border-style: dashed; }
+.err { margin: 18px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--sev-major); background: var(--raised); color: var(--ink); }
+.err b { color: var(--sev-major); }
+
+/* inspector */
+.summary { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; padding: 14px 12px 10px; align-items: end; }
+.score { font-size: 44px; line-height: 0.9; font-weight: 700; letter-spacing: -0.02em; font-variation-settings: 'wdth' 82; }
+.score small { font-size: 15px; color: var(--muted); font-weight: 500; margin-left: 2px; }
+.summary .lab { grid-column: 1; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.counts { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; align-self: center; }
+.count { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.count b { font: 600 13px var(--font-mono); color: var(--ink); min-width: 2ch; text-align: right; }
+.sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.sw.major { background: var(--sev-major); }
+.sw.minor { background: var(--sev-minor); }
+.sw.missing { border: 2px dashed var(--plate-d); }
+.sw.extra { border: 2px dashed var(--plate-m); }
+.sw.ok { background: var(--sev-ok); }
+.evalline { margin: 0 12px 10px; padding: 8px 10px; border-radius: 8px; background: var(--raised); border: 1px solid var(--line-2); font-size: 12.5px; color: var(--ink-2); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.evalline b { color: var(--ink); font-family: var(--font-mono); }
+.algo-note { margin: 0 12px 10px; font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.algo-note b { color: var(--ink); }
+.flist { list-style: none; margin: 0; padding: 0 6px 6px; max-height: 340px; overflow: auto; border-top: 1px solid var(--line-2); }
+.flist li { margin-top: 4px; }
+.fitem { width: 100%; display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 2px 10px; padding: 7px 8px 7px 0; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; }
+.fitem:hover { background: var(--raised); }
+.fitem[aria-current="true"] { background: var(--raised); border-color: var(--ink-2); }
+.fitem .bar { grid-row: span 2; border-radius: 2px; }
+.fitem .ttl { font-size: 13px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.fitem .nm { grid-column: 2; font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); min-width: 0; overflow-wrap: anywhere; }
+.fitem .sv { grid-row: span 2; align-self: center; font: 11px var(--font-mono); color: var(--ink-2); }
+.pill { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 10px; font: 600 10.5px var(--font-mono); letter-spacing: 0.02em; border: 1px solid var(--line); color: var(--ink); background: var(--raised); text-transform: uppercase; }
+.pill .sw { width: 8px; height: 8px; border-radius: 50%; }
+.pill .sw.missing, .pill .sw.extra { border-width: 1.5px; }
+.empty { padding: 18px 14px; color: var(--muted); font-size: 13px; }
+.empty b { color: var(--ink); }
+.detail { border-top: 1px solid var(--line-2); padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.detail h3 { margin: 0; font-size: 15px; line-height: 1.3; text-wrap: balance; }
+.detail .sub { color: var(--muted); font: 11.5px var(--font-mono); margin-top: 2px; overflow-wrap: anywhere; }
+.crops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.crop { background: var(--raised); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px; min-width: 0; }
+.crop .cap { font: 10.5px var(--font-mono); color: var(--ink-2); display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.crop .cap i { width: 8px; height: 8px; border-radius: 2px; }
+.crop canvas { width: 100%; height: auto; display: block; background: #fff; border-radius: 4px; }
+.crop .none { height: 70px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; text-align: center; padding: 6px; }
+table.dec { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.dec th { text-align: left; font-weight: 500; color: var(--ink-2); padding: 4px 0; }
+table.dec td { text-align: right; font: 12px var(--font-mono); padding: 4px 0 4px 10px; white-space: nowrap; }
+table.dec tr + tr th, table.dec tr + tr td { border-top: 1px solid var(--line-2); }
+table.dec tr.charged th { color: var(--ink); font-weight: 700; }
+table.dec tr.charged td { font-weight: 700; }
+table.dec caption { text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-bottom: 4px; }
+.refs { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
+.refs div { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 6px; }
+.refs code { font: 11.5px var(--font-mono); color: var(--ink); overflow-wrap: anywhere; }
+.meters { display: grid; gap: 6px; }
+.meter { display: grid; grid-template-columns: 64px minmax(0, 1fr) 38px; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.meter .track { position: relative; height: 8px; border-radius: 4px; background: var(--line-2); }
+.meter .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.meter .tick { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.meter output { font: 11.5px var(--font-mono); text-align: right; color: var(--ink); }
+.swatches { display: flex; gap: 10px; align-items: center; font: 11.5px var(--font-mono); color: var(--ink-2); flex-wrap: wrap; }
+.swatches i { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); display: inline-block; vertical-align: middle; margin-right: 4px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12.5px; }
+.kv dt { color: var(--ink-2); }
+.kv dd { margin: 0; font: 12px var(--font-mono); text-align: right; overflow-wrap: anywhere; }
+
+/* benchmark */
+.section { margin-top: 14px; }
+.section-h { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 6px 2px 10px; }
+.section-h h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; font-variation-settings: 'wdth' 88; }
+.section-h p { margin: 0; color: var(--ink-2); font-size: 13px; max-width: 78ch; }
+.section-h .grow { flex: 1; }
+.matrix-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; }
+table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 860px; font-size: 13px; }
+table.matrix th, table.matrix td { padding: 8px 10px; border-bottom: 1px solid var(--line-2); }
+table.matrix thead th { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; font-weight: 600; white-space: nowrap; }
+table.matrix tbody th { text-align: left; font-weight: 500; white-space: nowrap; }
+table.matrix tbody th small { display: block; color: var(--muted); font: 11px var(--font-mono); }
+table.matrix tfoot th, table.matrix tfoot td { border-bottom: 0; font-weight: 700; }
+.cell { display: flex; flex-direction: column; gap: 4px; width: 100%; min-width: 96px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; }
+.cell:hover { background: var(--raised); border-color: var(--line-2); }
+.cell[aria-current="true"] { border-color: var(--ink-2); background: var(--raised); }
+.dots { display: flex; gap: 3px; align-items: center; min-height: 10px; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--ink-2); }
+.dots i.on { background: var(--ink); border-color: var(--ink); }
+.dots em { font-style: normal; font: 10.5px var(--font-mono); color: var(--muted); }
+.fp { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; font: 11.5px var(--font-mono); color: var(--ink-2); }
+.fp .t { height: 6px; border-radius: 3px; background: var(--line-2); position: relative; overflow: hidden; }
+.fp .t span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--muted); }
+.fp b { font-weight: 600; color: var(--ink); }
+.bars { margin-top: 12px; padding: 14px; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; display: grid; gap: 7px; }
+.bars h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.barrow { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px; }
+.barrow .track { display: flex; align-items: center; gap: 6px; height: 22px; border-left: 1px solid var(--line); min-width: 0; }
+.barrow .track .b { flex: none; height: 14px; border-radius: 0 4px 4px 0; background: var(--muted); min-width: 2px; }
+.barrow .track .b.me { background: var(--accent); }
+.barrow .track .v { font: 11.5px var(--font-mono); color: var(--ink); white-space: nowrap; }
+.barrow .nm { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barrow .nm b { color: var(--ink); font-weight: 600; }
+.bench-status { font: 12px var(--font-mono); color: var(--muted); }
+
+/* method */
+.method { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.step { background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; padding: 14px; }
+.step .n { font: 11px var(--font-mono); color: var(--muted); }
+.step h3 { margin: 4px 0 6px; font-size: 15px; }
+.step p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+.step code { font: 12px var(--font-mono); color: var(--ink); }
+
+/* dialog */
+.modal { position: fixed; inset: 0; z-index: 30; background: rgba(8, 10, 12, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 64px 16px 16px; overflow: auto; }
+.modal .card { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.modal h3 { margin: 0; font-size: 17px; }
+.modal p { margin: 0; color: var(--ink-2); font-size: 13px; }
+.modal input[type=text], .modal textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
+.modal textarea { height: 180px; font: 12px/1.45 var(--font-mono); resize: vertical; }
+.modal .radios { display: flex; gap: 14px; }
+.modal .radios label, .modal .file { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+.modal .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.modal .msg { font-size: 12.5px; color: var(--sev-major); min-height: 1em; }
+.toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; padding: 8px 14px; border-radius: 10px; background: var(--ink); color: var(--bg); font-size: 13px; box-shadow: var(--shadow); }
+
+</style>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <g fill="none" stroke-width="1.6">
+          <g stroke="var(--plate-d)"><circle cx="16" cy="16" r="9"/><circle cx="16" cy="16" r="4.2"/><path d="M16 2v28M2 16h28"/></g>
+          <g stroke="var(--plate-m)" opacity="0.9"><circle cx="18.2" cy="18.2" r="9"/><circle cx="18.2" cy="18.2" r="4.2"/><path d="M18.2 4.2v28M4.2 18.2h28"/></g>
+        </g>
+      </svg>
+      <div><h1>Redline</h1><p>design ⟷ build, compared as pixels</p></div>
+    </div>
+    <span class="spacer"></span>
+    <p class="note">Both sides are rasterized, segmented into a containment tree, aligned level by level, and every displacement is charged to exactly one element. No algorithm reads the build’s DOM.</p>
+  </header>
+
+  <section class="controls" aria-label="What to compare">
+    <label class="field"><span>Design</span><span class="sel"><i style="background:var(--plate-d)"></i><select id="selDesign" aria-label="Design"></select></span></label>
+    <label class="field"><span>Build</span><span class="sel"><i style="background:var(--plate-m)"></i><select id="selImpl" aria-label="Build"></select></span></label>
+    <div class="field"><span>Algorithm</span><div class="chips" id="algoChips" role="group" aria-label="Algorithm"></div></div>
+    <div class="ctl-end">
+      <button class="btn" id="btnTune" type="button" aria-pressed="false">Tune</button>
+      <button class="btn" id="btnSource" type="button" aria-pressed="false">Source</button>
+      <button class="btn solid" id="btnAdd" type="button">Add your own</button>
+    </div>
+  </section>
+  <section class="drawer" id="drawerTune" hidden aria-label="Parameters"></section>
+  <section class="drawer" id="drawerSource" hidden aria-label="Source"></section>
+
+  <main class="bench">
+    <aside class="pane rail" aria-label="Presets">
+      <div class="pane-h"><h2>Presets</h2></div>
+      <div class="list" id="gallery"></div>
+      <div class="foot">Each preset is a design, a build and an algorithm. Use the selectors above to pair any design with any build.</div>
+    </aside>
+    <section class="pane stage" aria-label="Stage">
+      <div class="pane-h">
+        <div class="views" id="views" role="group" aria-label="View">
+          <button type="button" data-view="diff" aria-pressed="true">Diff</button>
+          <button type="button" data-view="side" aria-pressed="false">Side by side</button>
+          <button type="button" data-view="plates" aria-pressed="false">Plates</button>
+          <button type="button" data-view="swipe" aria-pressed="false">Swipe</button>
+          <button type="button" data-view="segments" aria-pressed="false">Segments</button>
+        </div>
+        <span class="grow"></span>
+        <label class="opt" for="optSpot"><input type="checkbox" id="optSpot" checked> Spotlight</label>
+        <label class="opt" for="optOk"><input type="checkbox" id="optOk"> Show matched</label>
+        <span class="busy" id="busy" aria-hidden="true"></span>
+      </div>
+      <div class="mat" id="mat"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+    <aside class="pane insp" id="insp" aria-label="Inspector"></aside>
+  </main>
+
+  <section class="section" aria-labelledby="benchTitle">
+    <div class="section-h">
+      <h2 id="benchTitle">Benchmark</h2>
+      <p>Every preset build against its design, through every algorithm. A finding is a hit when it overlaps a planted bug; anything else is a false alarm (FA). Dots are planted bugs, filled when found. Click a cell to inspect it.</p>
+      <span class="grow"></span>
+      <span class="bench-status" id="benchStatus"></span>
+      <button class="btn" id="btnBench" type="button">Re-run with current settings</button>
+    </div>
+    <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <section class="section" aria-labelledby="methodTitle">
+    <div class="section-h"><h2 id="methodTitle">How the full method works</h2></div>
+    <div class="method">
+      <div class="step"><div class="n">1 · rasterize</div><h3>Both sides become pixels</h3><p>The design SVG is drawn to a canvas as an image. The build HTML goes through an SVG <code>foreignObject</code>, so the browser lays it out and paints it, and the algorithms only ever receive the RGBA buffer. A PNG screenshot from Playwright enters the same way.</p></div>
+      <div class="step"><div class="n">2 · segment</div><h3>Pixels become a containment tree</h3><p>Edges are color steps above a threshold, from 1- and 2-pixel stencils so anti-aliased corners still close. Edge components and the regions between them form an alternating graph; a breadth-first walk from the frame border yields nesting. Closed components with a large hole are frames; the rest is ink, grouped into lines by gap/height ratio and into paragraphs by line spacing.</p></div>
+      <div class="step"><div class="n">3 · align</div><h3>Viterbi per level, inside matched parents</h3><p>Children are put in XY-cut reading order and aligned by a first-order Viterbi pass. Emission compares kind, size and color, with text measured against the page’s estimated font scale. Transitions are free when displacement is consistent or a gap to the previous match is preserved, and a skipped element may close its gap. Skips, 2:1 text merges and an order-free rescue pass cover missing, extra and swapped elements.</p></div>
+      <div class="step"><div class="n">4 · attribute</div><h3>Each displacement is charged once</h3><p>An element can be explained by its parent’s edges or center, the sibling it flows after or before, a sibling it was aligned with in the design, or a gap a missing sibling left. Each reference is an edge weighted by the residual it leaves; Chu–Liu/Edmonds picks the minimum arborescence rooted at the parent, so a cascade lands on its first element and two siblings can’t excuse each other. Rows and columns form flow chains anchored at the end that moved least, and a changed gap inside a chain can’t be explained away from the far side. Heights may follow content; text is compared by ink mass, so reflow is free.</p></div>
+    </div>
+  </section>
+</div>
+<div id="modalRoot"></div>
+<script>
+/* =====================================================================
+   Redline engine — layout registration from pixels only.
+   Both sides are rasterized; nothing below ever reads the DOM of the
+   implementation. Segmentation → containment tree → per-level alignment
+   → residual attribution (parent + flow) → findings.
+   ===================================================================== */
+const Engine = (() => {
+  'use strict';
+
+  /* ---------------- geometry ---------------- */
+  const B = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
+  const W_ = b => b.x1 - b.x0;
+  const H_ = b => b.y1 - b.y0;
+  const CX = b => (b.x0 + b.x1) / 2;
+  const CY = b => (b.y0 + b.y1) / 2;
+  const AREA = b => Math.max(0, W_(b)) * Math.max(0, H_(b));
+  const UNION = (a, b) => B(Math.min(a.x0, b.x0), Math.min(a.y0, b.y0), Math.max(a.x1, b.x1), Math.max(a.y1, b.y1));
+  const UNIONS = arr => arr.reduce((u, b) => (u ? UNION(u, b) : b), null);
+  const INTER = (a, b) => {
+    const x0 = Math.max(a.x0, b.x0), y0 = Math.max(a.y0, b.y0), x1 = Math.min(a.x1, b.x1), y1 = Math.min(a.y1, b.y1);
+    return x1 > x0 && y1 > y0 ? B(x0, y0, x1, y1) : null;
+  };
+  const OVL = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+  const SHIFT = (b, dx, dy) => B(b.x0 + dx, b.y0 + dy, b.x1 + dx, b.y1 + dy);
+  const GROW = (b, p) => B(b.x0 - p, b.y0 - p, b.x1 + p, b.y1 + p);
+  const minAbs = arr => arr.reduce((m, v) => (Math.abs(v) < Math.abs(m) ? v : m), Infinity);
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+  /* ---------------- color ---------------- */
+  const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  function lab(rgb) {
+    const r = lin(rgb[0]), g = lin(rgb[1]), b = lin(rgb[2]);
+    const f = t => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    const X = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047);
+    const Y = f(r * 0.2126 + g * 0.7152 + b * 0.0722);
+    const Z = f((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883);
+    return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+  }
+  const dE = (a, b) => { const p = lab(a), q = lab(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+  const cdist = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+  const hex = c => '#' + c.map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+
+  /* ---------------- defaults ---------------- */
+  const DEFAULTS = {
+    edgeT: 10,          // max-channel step that counts as an edge
+    kH: 0.9,            // word/line merge: horizontal gap ≤ kH × glyph height
+    kV: 0.45,           // line→paragraph merge: vertical gap ≤ kV × line height (lists stay separate)
+    posTol: 6,          // px of unexplained displacement that is still fine
+    textPosMul: 1.5,    // text gets extra slack (ascender/line-box differences between fonts)
+    textSizeTol: 0.6,   // text ink mass may differ by ±60% (font fallback, weight); reflow is free
+    sizeTol: 6,         // px (or 5%) for boxes
+    colorTol: 12,       // ΔE76 for fills
+    textColorTol: 24,   // ΔE76 for text ink (anti-aliasing, weight)
+    transTau: 24,       // px that make one unit of positional cost in matching
+    gapBase: 1.4,       // cost to leave an element unmatched
+    resetPen: 0.4,      // cost of re-anchoring to the parent mid-sequence
+    posPrior: 0.05,     // tie-breaking parent-relative prior inside the emission cost
+    window: 6,          // max consecutive skips between linked matches
+    merges: true,       // allow 2:1 / 1:2 text block merges
+    rescue: true,       // order-free second pass for leftovers (swaps, wraps)
+    rescueMax: 2.0,
+    flatten: true,      // splice children of unmatched frames into the parent level
+    pixT: 40,           // pixel diff threshold (0–255)
+    ssimT: 0.72,        // SSIM below this is flagged
+  };
+
+  /* ---------------- rasterization ---------------- */
+  async function loadImage(url) {
+    const img = new Image();
+    img.src = url;
+    try { await img.decode(); } catch (e) {
+      throw new Error('The browser could not decode this input as an image (' + (e && e.message || 'decode failed') + ').');
+    }
+    return img;
+  }
+  function toImageData(img, W, H, mode) {
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    if (mode === 'fitWidth') {
+      const s = W / img.naturalWidth;
+      ctx.drawImage(img, 0, 0, W, img.naturalHeight * s);
+    } else ctx.drawImage(img, 0, 0, W, H);
+    try { return ctx.getImageData(0, 0, W, H); } catch (e) {
+      throw new Error('This browser refuses to read back the rendered HTML (tainted canvas). Use Chrome, or upload a PNG screenshot instead.');
+    }
+  }
+  function svgSize(svgText) {
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('The SVG is not well-formed XML.');
+    const svg = doc.documentElement;
+    let w = parseFloat(svg.getAttribute('width')), h = parseFloat(svg.getAttribute('height'));
+    const vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+    if ((!w || !h) && vb.length === 4) { w = w || vb[2]; h = h || vb[3]; }
+    return { w: Math.round(w || 800), h: Math.round(h || 600) };
+  }
+  function ensureSvgSize(svgText, W, H) {
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    const svg = doc.documentElement;
+    if (!svg.getAttribute('width')) svg.setAttribute('width', W);
+    if (!svg.getAttribute('height')) svg.setAttribute('height', H);
+    return new XMLSerializer().serializeToString(doc);
+  }
+  const svgUrl = s => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+
+  function htmlToXhtml(html, mutate) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script, link[rel="stylesheet"], iframe, object, embed').forEach(n => n.remove());
+    if (mutate) mutate(doc);
+    return new XMLSerializer().serializeToString(doc.documentElement);
+  }
+  function foreignObjectSvg(xhtml, W, H) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+      `<foreignObject x="0" y="0" width="${W}" height="${H}">${xhtml}</foreignObject></svg>`;
+  }
+  async function rasterize(src, W, H) {
+    if (src.type === 'svg') {
+      const img = await loadImage(svgUrl(ensureSvgSize(src.text, W, H)));
+      return toImageData(img, W, H);
+    }
+    if (src.type === 'html') {
+      const img = await loadImage(svgUrl(foreignObjectSvg(htmlToXhtml(src.text), W, H)));
+      return toImageData(img, W, H);
+    }
+    if (src.type === 'image') {
+      const img = await loadImage(src.url);
+      return toImageData(img, W, H, 'fitWidth');
+    }
+    throw new Error('Unknown source type ' + src.type);
+  }
+  function nativeSize(src) {
+    return new Promise((resolve, reject) => {
+      if (src.type === 'svg') return resolve(svgSize(src.text));
+      if (src.type === 'image') {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = () => reject(new Error('Image did not load.'));
+        img.src = src.url;
+        return;
+      }
+      resolve(null);
+    });
+  }
+
+  /* Ground truth for the benchmark. The eval harness (never the algorithms)
+     re-renders the implementation with every [data-bug] element painted a
+     unique solid color and everything else visibility:hidden — same layout,
+     so the marker pixels give exact boxes. */
+  async function groundTruth(html, W, H) {
+    const labels = [];
+    const xhtml = htmlToXhtml(html, doc => {
+      const st = doc.createElement('style');
+      st.textContent = 'html, html *{visibility:hidden!important;}';
+      (doc.head || doc.documentElement).appendChild(st);
+      doc.querySelectorAll('[data-bug]').forEach((el, k) => {
+        labels.push(el.getAttribute('data-bug'));
+        const col = `rgb(${(k * 53 + 31) % 200 + 40},${255 - k},${(k * 97 + 11) % 200 + 40})`;
+        el.style.setProperty('visibility', 'visible', 'important');
+        el.style.setProperty('background', col, 'important');
+        el.style.setProperty('border-color', 'transparent', 'important');
+        el.style.setProperty('box-shadow', 'none', 'important');
+        el.style.setProperty('outline', 'none', 'important');
+        el.style.setProperty('color', 'transparent', 'important');
+        el.setAttribute('data-bugk', k);
+      });
+    });
+    if (!labels.length) return [];
+    const img = await loadImage(svgUrl(foreignObjectSvg(xhtml, W, H)));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(img, 0, 0, W, H);
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const boxes = labels.map(() => null);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const k = 255 - d[i + 1];
+      if (k < 0 || k >= labels.length || d[i] === 0) continue;
+      const er = (k * 53 + 31) % 200 + 40, eb = (k * 97 + 11) % 200 + 40;
+      if (Math.abs(d[i] - er) > 2 || Math.abs(d[i + 2] - eb) > 2) continue;
+      const b = boxes[k];
+      if (!b) boxes[k] = B(x, y, x + 1, y + 1);
+      else { if (x < b.x0) b.x0 = x; if (y < b.y0) b.y0 = y; if (x + 1 > b.x1) b.x1 = x + 1; if (y + 1 > b.y1) b.y1 = y + 1; }
+    }
+    return labels.map((label, k) => boxes[k] && { label, box: boxes[k], space: 'impl' }).filter(Boolean);
+  }
+
+  /* ---------------- segmentation ---------------- */
+  /* The page background is what lies "outside" the frame, so it is sampled on the
+     frame border (a nav or sidebar may touch one edge, the page touches the most). */
+  function pageBackground(data, W, H) {
+    const cnt = new Map();
+    let top = 0xffffff, topN = 0;
+    const visit = (x, y) => {
+      const i = (y * W + x) * 4;
+      const exact = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+      const v = (cnt.get(exact) || 0) + 1;
+      cnt.set(exact, v);
+      if (v > topN) { topN = v; top = exact; }
+    };
+    for (let x = 0; x < W; x++) { visit(x, 0); visit(x, H - 1); }
+    for (let y = 1; y < H - 1; y++) { visit(0, y); visit(W - 1, y); }
+    return [(top >> 16) & 255, (top >> 8) & 255, top & 255];
+  }
+
+  class UF {
+    constructor(n) { this.p = new Int32Array(n); for (let i = 0; i < n; i++) this.p[i] = i; }
+    find(a) { const p = this.p; while (p[a] !== a) { p[a] = p[p[a]]; a = p[a]; } return a; }
+    union(a, b) { a = this.find(a); b = this.find(b); if (a !== b) this.p[b] = a; }
+  }
+
+  function segment(img, Pin) {
+    const P = Object.assign({}, DEFAULTS, Pin || {});
+    const t0 = performance.now();
+    const { width: W, height: H, data } = img;
+    const W2 = W + 2, H2 = H + 2, N = W2 * H2;
+    const bg = pageBackground(data, W, H);
+    const R = new Uint8Array(N).fill(bg[0]), G = new Uint8Array(N).fill(bg[1]), Bc = new Uint8Array(N).fill(bg[2]);
+    for (let y = 0; y < H; y++) {
+      let si = y * W * 4, di = (y + 1) * W2 + 1;
+      for (let x = 0; x < W; x++, si += 4, di++) { R[di] = data[si]; G[di] = data[si + 1]; Bc[di] = data[si + 2]; }
+    }
+    // Edge map: compare each pixel with its 1- and 2-step right/down neighbours, mark both sides.
+    const T = P.edgeT;
+    const E = new Uint8Array(N);
+    for (let y = 0; y < H2; y++) {
+      const row = y * W2;
+      for (let x = 0; x < W2; x++) {
+        const i = row + x;
+        const r = R[i], g = G[i], b = Bc[i];
+        // 1- and 2-step comparisons, marking every pixel they span. Edges come out ~4px
+        // thick: glyph strokes fill in solid, anti-aliased low-contrast corners still close.
+        if (x + 1 < W2) {
+          const j = i + 1;
+          const d = Math.max(Math.abs(r - R[j]), Math.abs(g - G[j]), Math.abs(b - Bc[j]));
+          if (d > T) { E[i] = 1; E[j] = 1; }
+          if (x + 2 < W2) {
+            const k = i + 2;
+            const d2 = Math.max(Math.abs(r - R[k]), Math.abs(g - G[k]), Math.abs(b - Bc[k]));
+            if (d2 > T) { E[i] = 1; E[j] = 1; E[k] = 1; }
+          }
+        }
+        if (y + 1 < H2) {
+          const j = i + W2;
+          const d = Math.max(Math.abs(r - R[j]), Math.abs(g - G[j]), Math.abs(b - Bc[j]));
+          if (d > T) { E[i] = 1; E[j] = 1; }
+          if (y + 2 < H2) {
+            const k = j + W2;
+            const d2 = Math.max(Math.abs(r - R[k]), Math.abs(g - G[k]), Math.abs(b - Bc[k]));
+            if (d2 > T) { E[i] = 1; E[j] = 1; E[k] = 1; }
+          }
+        }
+      }
+    }
+    // The padding ring is never an edge, so "outside" stays one region that surrounds
+    // everything, even when a full-width rule spans the frame edge to edge.
+    for (let x = 0; x < W2; x++) { E[x] = 0; E[(H2 - 1) * W2 + x] = 0; }
+    for (let y = 0; y < H2; y++) { E[y * W2] = 0; E[y * W2 + W2 - 1] = 0; }
+    // Connected components of edges (8-conn) and of non-edge regions (4-conn).
+    const lab = new Int32Array(N), rl = new Int32Array(N), stack = new Int32Array(N);
+    const comps = [null], regs = [null];
+    for (let s = 0; s < N; s++) {
+      if (!E[s] || lab[s]) continue;
+      const id = comps.length;
+      let sp = 0; stack[sp++] = s; lab[s] = id;
+      let n = 0, x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+      while (sp) {
+        const p = stack[--sp]; n++;
+        const px = p % W2, py = (p - px) / W2;
+        if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+        const yA = py > 0 ? -1 : 0, yB = py < H2 - 1 ? 1 : 0, xA = px > 0 ? -1 : 0, xB = px < W2 - 1 ? 1 : 0;
+        for (let dy = yA; dy <= yB; dy++) for (let dx = xA; dx <= xB; dx++) {
+          const q = p + dy * W2 + dx;
+          if (E[q] && !lab[q]) { lab[q] = id; stack[sp++] = q; }
+        }
+      }
+      comps.push({ id, n, px0: x0, py0: y0, px1: x1, py1: y1 });
+    }
+    for (let s = 0; s < N; s++) {
+      if (E[s] || rl[s]) continue;
+      const id = regs.length;
+      let sp = 0; stack[sp++] = s; rl[s] = id;
+      let n = 0, x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+      while (sp) {
+        const p = stack[--sp]; n++;
+        const px = p % W2, py = (p - px) / W2;
+        if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+        if (px > 0) { const q = p - 1; if (!E[q] && !rl[q]) { rl[q] = id; stack[sp++] = q; } }
+        if (px < W2 - 1) { const q = p + 1; if (!E[q] && !rl[q]) { rl[q] = id; stack[sp++] = q; } }
+        if (py > 0) { const q = p - W2; if (!E[q] && !rl[q]) { rl[q] = id; stack[sp++] = q; } }
+        if (py < H2 - 1) { const q = p + W2; if (!E[q] && !rl[q]) { rl[q] = id; stack[sp++] = q; } }
+      }
+      regs.push({ id, n, px0: x0, py0: y0, px1: x1, py1: y1 });
+    }
+    const nc = comps.length - 1, nr = regs.length - 1;
+    // Bipartite adjacency edge-component ↔ region.
+    const adjC = Array.from({ length: nc + 1 }, () => []);
+    const adjR = Array.from({ length: nr + 1 }, () => []);
+    const lastR = new Int32Array(nc + 1);
+    const link = (c, r) => {
+      if (!r || lastR[c] === r) return;
+      lastR[c] = r;
+      const a = adjC[c];
+      for (let k = 0; k < a.length; k++) if (a[k] === r) return;
+      a.push(r); adjR[r].push(c);
+    };
+    for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+      const i = y * W2 + x, c = lab[i];
+      if (!c) continue;
+      if (x > 0) link(c, rl[i - 1]);
+      if (x < W2 - 1) link(c, rl[i + 1]);
+      if (y > 0) link(c, rl[i - W2]);
+      if (y < H2 - 1) link(c, rl[i + W2]);
+    }
+    // Containment tree by BFS from the outer region (alternating region/component layers).
+    const outer = rl[0];
+    const parentRegion = new Int32Array(nc + 1).fill(-1);
+    const encl = new Int32Array(nr + 1).fill(-1);
+    encl[outer] = 0;
+    const queue = [outer], order = [];
+    for (let qi = 0; qi < queue.length; qi++) {
+      const r = queue[qi];
+      for (const c of adjR[r]) {
+        if (parentRegion[c] !== -1) continue;
+        parentRegion[c] = r; order.push(c);
+        for (const r2 of adjC[c]) if (encl[r2] === -1) { encl[r2] = c; queue.push(r2); }
+      }
+    }
+    const holesOf = Array.from({ length: nc + 1 }, () => []);
+    for (let r = 1; r <= nr; r++) if (encl[r] > 0) holesOf[encl[r]].push(r);
+    const compsIn = Array.from({ length: nr + 1 }, () => []);
+    for (const c of order) compsIn[parentRegion[c]].push(c);
+    const encA = new Float64Array(nc + 1), holeA = new Float64Array(nr + 1);
+    for (let k = order.length - 1; k >= 0; k--) {
+      const c = order[k];
+      let s = comps[c].n;
+      for (const h of holesOf[c]) {
+        let ha = regs[h].n;
+        for (const c2 of compsIn[h]) ha += encA[c2];
+        holeA[h] = ha; s += ha;
+      }
+      encA[c] = s;
+    }
+    // Region color statistics (mode + spread), lazily.
+    const QH = new Uint32Array(32768), QR = new Float64Array(32768), QG = new Float64Array(32768), QB = new Float64Array(32768);
+    const regionInfo = new Map();
+    function regionStats(r) {
+      if (regionInfo.has(r)) return regionInfo.get(r);
+      const g = regs[r];
+      const w = g.px1 - g.px0 + 1, h = g.py1 - g.py0 + 1;
+      let step = Math.max(1, Math.floor(Math.sqrt((w * h) / 9000)));
+      let res = null;
+      for (let attempt = 0; attempt < 2 && !res; attempt++, step = 1) {
+        const touched = [];
+        let n = 0, sr = 0, sg = 0, sb = 0, sr2 = 0, sg2 = 0, sb2 = 0;
+        for (let y = g.py0; y <= g.py1; y += step) for (let x = g.px0; x <= g.px1; x += step) {
+          const i = y * W2 + x;
+          if (rl[i] !== r) continue;
+          const rr = R[i], gg = G[i], bb = Bc[i];
+          const k = ((rr >> 3) << 10) | ((gg >> 3) << 5) | (bb >> 3);
+          if (!QH[k]) touched.push(k);
+          QH[k]++; QR[k] += rr; QG[k] += gg; QB[k] += bb;
+          n++; sr += rr; sg += gg; sb += bb; sr2 += rr * rr; sg2 += gg * gg; sb2 += bb * bb;
+        }
+        if (!n) continue;
+        let bk = touched[0];
+        for (const k of touched) if (QH[k] > QH[bk]) bk = k;
+        const mode = [QR[bk] / QH[bk], QG[bk] / QH[bk], QB[bk] / QH[bk]];
+        const v = (sr2 / n - (sr / n) ** 2) + (sg2 / n - (sg / n) ** 2) + (sb2 / n - (sb / n) ** 2);
+        res = { mode, std: Math.sqrt(Math.max(0, v) / 3), share: QH[bk] / n };
+        for (const k of touched) { QH[k] = 0; QR[k] = 0; QG[k] = 0; QB[k] = 0; }
+      }
+      res = res || { mode: bg.slice(), std: 0, share: 1 };
+      regionInfo.set(r, res);
+      return res;
+    }
+    const boxOf = c => B(c.px0 - 1, c.py0 - 1, c.px1, c.py1); // padded → image coords, exclusive max
+
+    function classify(c) {
+      const cc = comps[c];
+      const box = boxOf(cc);
+      const w = W_(box), h = H_(box);
+      if (w < 10 || h < 10 || !holesOf[c].length) return null;
+      const A = (cc.px1 - cc.px0 + 1) * (cc.py1 - cc.py0 + 1);
+      const sol = encA[c] / A;
+      let hsum = 0, big = 0, bigA = 0;
+      for (const hh of holesOf[c]) { hsum += holeA[hh]; if (holeA[hh] > bigA) { bigA = holeA[hh]; big = hh; } }
+      const hr = hsum / A;
+      if (hr < 0.28 || sol < 0.6) return null;
+      const outside = regionStats(parentRegion[c]).mode;
+      const inner = regionStats(big);
+      const filled = cdist(inner.mode, outside) > T;
+      if (filled) { if (sol < 0.64 || hr < 0.3) return null; }
+      else if (sol < 0.85 || hr < 0.5 || w < 20 || h < 14) return null;
+      return { filled, fill: filled ? inner.mode : outside, std: inner.std, sol, box };
+    }
+
+    let nid = 0;
+    const all = [];
+    const mk = (kind, box, extra) => { const n = Object.assign({ id: ++nid, kind, box, children: [] }, extra); all.push(n); return n; };
+
+    function groupInk(ink) {
+      const n = ink.length;
+      if (!n) return [];
+      const hs = ink.map(o => H_(o.box)).filter(h => h >= 6).sort((a, b) => a - b);
+      const med = hs.length ? hs[hs.length >> 1] : 12;
+      const maxH = ink.reduce((m, o) => Math.max(m, H_(o.box)), 0);
+      const isRule = o => (H_(o.box) <= 6 && W_(o.box) >= 4 * H_(o.box) && W_(o.box) >= 16) || (W_(o.box) <= 6 && H_(o.box) >= 4 * W_(o.box) && H_(o.box) >= 16);
+      const uf = new UF(n);
+      const idx = [...Array(n).keys()].sort((a, b) => ink[a].box.x0 - ink[b].box.x0);
+      for (let ii = 0; ii < n; ii++) {
+        const a = ink[idx[ii]];
+        if (isRule(a)) continue;
+        const ha = H_(a.box);
+        const reach = P.kH * Math.max(ha, maxH);
+        for (let jj = ii + 1; jj < n; jj++) {
+          const b = ink[idx[jj]];
+          if (b.box.x0 - a.box.x1 > reach) break;
+          if (isRule(b)) continue;
+          const hb = H_(b.box);
+          const vov = OVL(a.box.y0, a.box.y1, b.box.y0, b.box.y1);
+          if (vov < 0.5 * Math.min(ha, hb)) continue;
+          const gap = Math.max(a.box.x0, b.box.x0) - Math.min(a.box.x1, b.box.x1);
+          if (gap <= P.kH * Math.max(ha, hb)) uf.union(idx[ii], idx[jj]);
+        }
+      }
+      const gmap = new Map();
+      for (let i = 0; i < n; i++) {
+        const r = uf.find(i);
+        if (!gmap.has(r)) gmap.set(r, { box: ink[i].box, members: [i], px: ink[i].n });
+        else { const g = gmap.get(r); g.box = UNION(g.box, ink[i].box); g.members.push(i); g.px += ink[i].n; }
+      }
+      let lines = [...gmap.values()];
+      // satellites (dots, accents, stray marks) join the nearest line that surrounds them
+      const tiny = l => l.members.length === 1 && Math.max(W_(l.box), H_(l.box)) <= 0.45 * med && !isRule(ink[l.members[0]]);
+      const big = lines.filter(l => !tiny(l));
+      for (const t of lines.filter(tiny)) {
+        let best = null, bd = Infinity;
+        const cx = CX(t.box), cy = CY(t.box);
+        for (const l of big) {
+          const g = GROW(l.box, 0.6 * H_(l.box));
+          if (cx < g.x0 || cx > g.x1 || cy < g.y0 || cy > g.y1) continue;
+          const d = Math.hypot(clamp(cx, l.box.x0, l.box.x1) - cx, clamp(cy, l.box.y0, l.box.y1) - cy);
+          if (d < bd) { bd = d; best = l; }
+        }
+        if (best) { best.box = UNION(best.box, t.box); best.members.push(...t.members); best.px += t.px; t.dead = true; }
+      }
+      lines = lines.filter(l => !l.dead);
+      lines.forEach(l => { l.rule = l.members.length === 1 && isRule(ink[l.members[0]]); });
+      // lines → paragraphs
+      const m = lines.length;
+      const uf2 = new UF(m);
+      const ord = [...Array(m).keys()].sort((a, b) => lines[a].box.y0 - lines[b].box.y0);
+      for (let ii = 0; ii < m; ii++) {
+        const a = lines[ord[ii]];
+        if (a.rule) continue;
+        for (let jj = ii + 1; jj < m; jj++) {
+          const b = lines[ord[jj]];
+          if (b.box.y0 - a.box.y1 > P.kV * maxH + 4) break;
+          if (b.rule) continue;
+          const ha = H_(a.box), hb = H_(b.box), hmin = Math.min(ha, hb), hmax = Math.max(ha, hb);
+          if (hmax / hmin > 1.6) continue;
+          const vgap = b.box.y0 - a.box.y1;
+          if (vgap < -0.3 * hmin || vgap > P.kV * hmin) continue;
+          const xo = OVL(a.box.x0, a.box.x1, b.box.x0, b.box.x1);
+          const tol = 0.6 * hmax;
+          const aligned = Math.abs(a.box.x0 - b.box.x0) <= tol || Math.abs(CX(a.box) - CX(b.box)) <= tol || Math.abs(a.box.x1 - b.box.x1) <= tol;
+          if (xo < 0.25 * Math.min(W_(a.box), W_(b.box)) && !aligned) continue;
+          uf2.union(ord[ii], ord[jj]);
+        }
+      }
+      const pmap = new Map();
+      for (let i = 0; i < m; i++) {
+        const r = uf2.find(i);
+        const l = lines[i];
+        if (!pmap.has(r)) pmap.set(r, { box: l.box, lines: 1, parts: l.members.length, px: l.px, rule: l.rule, members: l.members.slice() });
+        else { const p = pmap.get(r); p.box = UNION(p.box, l.box); p.lines++; p.parts += l.members.length; p.px += l.px; p.rule = false; p.members.push(...l.members); }
+      }
+      return [...pmap.values()].map(p => {
+        const w = W_(p.box), h = H_(p.box);
+        let kind = 'text';
+        if (p.rule) kind = 'rule';
+        else if (p.lines === 1 && p.parts <= 2 && w / h > 0.6 && w / h < 1.6 && h <= 2.4 * med) kind = 'icon';
+        else if (p.lines === 1 && p.parts === 1 && w >= 40 && h >= 40) kind = 'image';
+        // Word-shape signature: normalized widths of the horizontal runs (≈ words) of a one-line block.
+        let sig = null;
+        if (kind === 'text' && p.lines === 1) {
+          const iv = p.members.map(k => [ink[k].box.x0, ink[k].box.x1]).sort((a, b) => a[0] - b[0]);
+          const runs = [];
+          for (const [a, b] of iv) { const last = runs[runs.length - 1]; if (last && a <= last[1] + 1) last[1] = Math.max(last[1], b); else runs.push([a, b]); }
+          sig = runs.map(([a, b]) => (b - a) / Math.max(1, w));
+        }
+        return { kind, box: p.box, lines: p.lines, parts: p.parts, px: p.px, sig, density: p.px / Math.max(1, w * h) };
+      });
+    }
+
+    function buildLevel(regionList, parentFill, depth, parent) {
+      const nodes = [], ink = [];
+      const queue = regionList.slice();
+      for (let qi = 0; qi < queue.length; qi++) for (const c of compsIn[queue[qi]]) {
+        const cls = classify(c);
+        if (cls) {
+          const node = mk('container', cls.box, { fill: cls.fill, filled: cls.filled, solidity: cls.sol, std: cls.std, depth, parent, bg: parentFill });
+          node.children = buildLevel(holesOf[c], cls.fill, depth + 1, node);
+          if (!node.children.length) node.kind = cls.std > 26 ? 'image' : 'shape';
+          node.color = node.fill;
+          nodes.push(node);
+        } else {
+          ink.push({ c, box: boxOf(comps[c]), n: comps[c].n });
+          // Anything enclosed by a non-frame (a glyph counter is empty; a broken outline is not)
+          // is promoted to this level rather than dropped.
+          for (const h of holesOf[c]) if (compsIn[h].length) queue.push(h);
+        }
+      }
+      for (const blk of groupInk(ink)) {
+        const node = mk(blk.kind, blk.box, { lines: blk.lines, parts: blk.parts, px: blk.px, sig: blk.sig, density: blk.density, depth, parent, bg: parentFill });
+        node.color = inkColor(data, W, H, blk.box, parentFill);
+        nodes.push(node);
+      }
+      return nodes;
+    }
+
+    const root = { id: 0, kind: 'root', box: B(0, 0, W, H), fill: bg, color: bg, depth: 0, children: [] };
+    root.children = buildLevel([outer], bg, 1, root);
+    const ms = performance.now() - t0;
+    return { root, nodes: all, W, H, bg, stats: { edgeComponents: nc, regions: nr, nodes: all.length, ms } };
+  }
+
+  function inkColor(data, W, H, box, bgc) {
+    const x0 = clamp(Math.floor(box.x0), 0, W - 1), x1 = clamp(Math.ceil(box.x1), 1, W);
+    const y0 = clamp(Math.floor(box.y0), 0, H - 1), y1 = clamp(Math.ceil(box.y1), 1, H);
+    const step = Math.max(1, Math.floor(Math.sqrt(((x1 - x0) * (y1 - y0)) / 5000)));
+    const s = [];
+    for (let y = y0; y < y1; y += step) for (let x = x0; x < x1; x += step) {
+      const i = (y * W + x) * 4;
+      const c = [data[i], data[i + 1], data[i + 2]];
+      const d = cdist(c, bgc);
+      if (d > 24) s.push([d, c]);
+    }
+    if (!s.length) return bgc.slice();
+    s.sort((a, b) => b[0] - a[0]);
+    const k = Math.max(1, Math.round(s.length * 0.12));
+    const acc = [0, 0, 0];
+    for (let i = 0; i < k; i++) { acc[0] += s[i][1][0]; acc[1] += s[i][1][1]; acc[2] += s[i][1][2]; }
+    return acc.map(v => v / k);
+  }
+
+  /* ---------------- reading order (recursive XY-cut) ---------------- */
+  function cutGroups(items, lo, hi) {
+    const s = items.slice().sort((a, b) => lo(a.box) - lo(b.box));
+    const groups = [];
+    let cur = [], end = -Infinity;
+    for (const it of s) {
+      if (cur.length && lo(it.box) >= end - 1) { groups.push(cur); cur = []; end = -Infinity; }
+      cur.push(it); end = Math.max(end, hi(it.box));
+    }
+    if (cur.length) groups.push(cur);
+    return groups;
+  }
+  function xyOrder(items) {
+    if (items.length <= 1) return items.slice();
+    const ys = cutGroups(items, b => b.y0, b => b.y1);
+    if (ys.length > 1) return ys.flatMap(xyOrder);
+    const xs = cutGroups(items, b => b.x0, b => b.x1);
+    if (xs.length > 1) return xs.flatMap(xyOrder);
+    return items.slice().sort((a, b) => (a.box.y0 - b.box.y0) || (a.box.x0 - b.box.x0));
+  }
+
+  /* ---------------- costs ---------------- */
+  const KIND_GROUP = { container: 'box', shape: 'box', image: 'box', text: 'ink', icon: 'ink', rule: 'rule', root: 'box' };
+  function kindCost(a, b) {
+    if (a === b) return 0;
+    const ga = KIND_GROUP[a], gb = KIND_GROUP[b];
+    if (ga === gb) return 0.35;
+    if (ga === 'rule' || gb === 'rule') return 1.1;
+    return 1.6;
+  }
+  function parentResidual(db, mb, PD, PM) {
+    const ex = [(mb.x0 - PM.x0) - (db.x0 - PD.x0), (CX(mb) - CX(PM)) - (CX(db) - CX(PD)), (mb.x1 - PM.x1) - (db.x1 - PD.x1)];
+    const ey = [(mb.y0 - PM.y0) - (db.y0 - PD.y0), (CY(mb) - CY(PM)) - (CY(db) - CY(PD)), (mb.y1 - PM.y1) - (db.y1 - PD.y1)];
+    return { x: minAbs(ex), y: minAbs(ey) };
+  }
+  /* Emission: how plausible is it that d and m are the same element, ignoring where
+     they sit. Text is compared relative to the page-wide font scale (P.ts), which the
+     box algorithms estimate in a first pass: a fallback font that makes every label
+     6% wider is not evidence, a label that is 17% wider than its peers is. */
+  function emission(dRep, mRep, db, mb, P) {
+    let c = kindCost(dRep.kind, mRep.kind);
+    const ink = KIND_GROUP[dRep.kind] === 'ink' && KIND_GROUP[mRep.kind] === 'ink';
+    const rw = Math.log(Math.max(1, W_(mb)) / Math.max(1, W_(db)));
+    const rh = Math.log(Math.max(1, H_(mb)) / Math.max(1, H_(db)));
+    if (ink) {
+      const ts = P.ts;
+      if (ts && dRep.lines === 1 && mRep.lines === 1) {
+        c += 5 * Math.max(0, Math.abs(rw - ts.w) - 0.04) + 2 * Math.max(0, Math.abs(rh - ts.h) - 0.1);
+      } else if (ts && dRep.px && mRep.px) {
+        c += 1.5 * Math.max(0, Math.abs(Math.log(mRep.px / dRep.px) - ts.m) - 0.15) + 0.5 * Math.max(0, Math.abs(rw) - 0.3);
+      } else c += 0.9 * (Math.max(0, Math.abs(rw) - 0.15) + Math.max(0, Math.abs(rh) - 0.3));
+    } else c += 1.4 * (Math.max(0, Math.abs(rw) - 0.03) + Math.max(0, Math.abs(rh) - 0.03));
+    if (dRep.color && mRep.color) c += Math.min(1.2, dE(dRep.color, mRep.color) / 45);
+    return c;
+  }
+  const median = a => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); const k = s.length >> 1; return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; };
+  function estimateTextScale(findings) {
+    const w = [], h = [], m = [];
+    for (const f of findings) {
+      if (!f.dNodes || f.dNodes.length !== 1 || !f.mNodes || f.mNodes.length !== 1) continue;
+      const d = f.dNodes[0], n = f.mNodes[0];
+      if (d.kind !== 'text' || n.kind !== 'text') continue;
+      if (d.px && n.px) m.push(Math.log(n.px / d.px));
+      if (d.lines === 1 && n.lines === 1) { w.push(Math.log(W_(n.box) / W_(d.box))); h.push(Math.log(H_(n.box) / H_(d.box))); }
+    }
+    if (w.length < 3 && m.length < 3) return null;
+    return { w: median(w), h: median(h), m: median(m), n: Math.max(w.length, m.length) };
+  }
+  /* Transition between consecutive matched units. Consistent displacement is
+     free; so is a preserved gap along either flow axis (the previous element
+     grew, this one followed). Skipped design elements may close their gap,
+     inserted implementation elements may open one. */
+  function transCost(pu, cu, P, skD, skM) {
+    const dxp = pu.mb.x0 - pu.db.x0, dyp = pu.mb.y0 - pu.db.y0;
+    const dxc = cu.mb.x0 - cu.db.x0, dyc = cu.mb.y0 - cu.db.y0;
+    let best = Math.hypot(dxc - dxp, dyc - dyp);
+    if (cu.db.y0 >= pu.db.y1 - 4) {
+      const ax = Math.min(
+        Math.abs((cu.mb.x0 - pu.mb.x0) - (cu.db.x0 - pu.db.x0)),
+        Math.abs((CX(cu.mb) - CX(pu.mb)) - (CX(cu.db) - CX(pu.db))),
+        Math.abs((cu.mb.x1 - pu.mb.x1) - (cu.db.x1 - pu.db.x1)));
+      const gm = cu.mb.y0 - pu.mb.y1, gd = cu.db.y0 - pu.db.y1;
+      let gy = Math.abs(gm - gd);
+      const sd = skD && skD.filter(n => n.box.y0 >= pu.db.y1 - 4 && n.box.y1 <= cu.db.y0 + 4);
+      if (sd && sd.length) {
+        const top = Math.min(...sd.map(n => n.box.y0)), bot = Math.max(...sd.map(n => n.box.y1));
+        gy = Math.min(gy, Math.abs(gm - (top - pu.db.y1)), Math.abs(gm - (cu.db.y0 - bot)));
+      }
+      const sm = skM && skM.filter(n => n.box.y0 >= pu.mb.y1 - 4 && n.box.y1 <= cu.mb.y0 + 4);
+      if (sm && sm.length) {
+        const bot = Math.max(...sm.map(n => n.box.y1)), top = Math.min(...sm.map(n => n.box.y0));
+        gy = Math.min(gy, Math.abs((cu.mb.y0 - bot) - gd), Math.abs((top - pu.mb.y1) - gd));
+      }
+      best = Math.min(best, Math.hypot(gy, ax));
+    }
+    if (cu.db.x0 >= pu.db.x1 - 4) {
+      const ay = Math.min(
+        Math.abs((cu.mb.y0 - pu.mb.y0) - (cu.db.y0 - pu.db.y0)),
+        Math.abs((CY(cu.mb) - CY(pu.mb)) - (CY(cu.db) - CY(pu.db))),
+        Math.abs((cu.mb.y1 - pu.mb.y1) - (cu.db.y1 - pu.db.y1)));
+      const gm = cu.mb.x0 - pu.mb.x1, gd = cu.db.x0 - pu.db.x1;
+      let gx = Math.abs(gm - gd);
+      const sd = skD && skD.filter(n => n.box.x0 >= pu.db.x1 - 4 && n.box.x1 <= cu.db.x0 + 4);
+      if (sd && sd.length) {
+        const lf = Math.min(...sd.map(n => n.box.x0)), rt = Math.max(...sd.map(n => n.box.x1));
+        gx = Math.min(gx, Math.abs(gm - (lf - pu.db.x1)), Math.abs(gm - (cu.db.x0 - rt)));
+      }
+      const sm = skM && skM.filter(n => n.box.x0 >= pu.mb.x1 - 4 && n.box.x1 <= cu.mb.x0 + 4);
+      if (sm && sm.length) {
+        const rt = Math.max(...sm.map(n => n.box.x1)), lf = Math.min(...sm.map(n => n.box.x0));
+        gx = Math.min(gx, Math.abs((cu.mb.x0 - rt) - gd), Math.abs((lf - pu.mb.x1) - gd));
+      }
+      best = Math.min(best, Math.hypot(gx, ay));
+    }
+    return Math.min(4, best / P.transTau);
+  }
+  const gapCost = (n, P) => P.gapBase + 0.22 * Math.log2(1 + AREA(n.box) / 600);
+  function plausibleMerge(nodes) {
+    if (!nodes.every(x => KIND_GROUP[x.kind] === 'ink')) return false;
+    const u = UNIONS(nodes.map(n => n.box));
+    return AREA(u) <= 1.9 * nodes.reduce((s, n) => s + AREA(n.box), 0) + 400;
+  }
+
+  /* ---------------- Hungarian (min-cost assignment) ---------------- */
+  function hungarian(cost) {
+    const n = cost.length, m = cost[0].length, INF = 1e18;
+    const u = new Float64Array(n + 1), v = new Float64Array(m + 1);
+    const p = new Int32Array(m + 1), way = new Int32Array(m + 1);
+    const minv = new Float64Array(m + 1), used = new Uint8Array(m + 1);
+    for (let i = 1; i <= n; i++) {
+      p[0] = i; let j0 = 0;
+      minv.fill(INF); used.fill(0);
+      do {
+        used[j0] = 1;
+        const i0 = p[j0], row = cost[i0 - 1];
+        let delta = INF, j1 = 0;
+        for (let j = 1; j <= m; j++) if (!used[j]) {
+          const cur = row[j - 1] - u[i0] - v[j];
+          if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+          if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+        }
+        for (let j = 0; j <= m; j++) if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta;
+        j0 = j1;
+      } while (p[j0] !== 0);
+      do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+    }
+    const ans = new Int32Array(n).fill(-1);
+    for (let j = 1; j <= m; j++) if (p[j]) ans[p[j] - 1] = j - 1;
+    return ans;
+  }
+  function assign(A, Bn, costFn, delFn, insFn) {
+    const n = A.length, m = Bn.length;
+    if (!n || !m) return { pairs: [], delA: A.slice(), insB: Bn.slice() };
+    const N = n + m, BIG = 1e9;
+    const C = [];
+    for (let i = 0; i < N; i++) {
+      const row = new Float64Array(N);
+      for (let j = 0; j < N; j++) {
+        if (i < n && j < m) row[j] = costFn(A[i], Bn[j]);
+        else if (i < n) row[j] = j - m === i ? delFn(A[i]) : BIG;
+        else if (j < m) row[j] = i - n === j ? insFn(Bn[j]) : BIG;
+        else row[j] = 0;
+      }
+      C.push(row);
+    }
+    const a = hungarian(C);
+    const pairs = [], delA = [], used = new Uint8Array(m);
+    for (let i = 0; i < n; i++) {
+      if (a[i] >= 0 && a[i] < m) { pairs.push([A[i], Bn[a[i]]]); used[a[i]] = 1; }
+      else delA.push(A[i]);
+    }
+    const insB = Bn.filter((_, j) => !used[j]);
+    return { pairs, delA, insB };
+  }
+
+  /* ---------------- per-level aligners ---------------- */
+  const mkUnit = (dn, mn) => ({ d: dn, m: mn, db: UNIONS(dn.map(x => x.box)), mb: UNIONS(mn.map(x => x.box)) });
+  const sameLine = nodes => nodes.every(n => OVL(n.box.y0, n.box.y1, nodes[0].box.y0, nodes[0].box.y1) > 0.5 * Math.min(H_(n.box), H_(nodes[0].box)));
+  const rep = nodes => nodes.length === 1 ? nodes[0] : {
+    kind: nodes.every(n => KIND_GROUP[n.kind] === 'ink') ? 'text' : nodes[0].kind, color: nodes[0].color,
+    lines: nodes.every(n => (n.lines || 1) === 1) && sameLine(nodes) ? 1 : 2, px: nodes.reduce((a, n) => a + (n.px || 0), 0) || null,
+  };
+
+  function hungarianAlign(D, M, Pd, Pm, P) {
+    const cost = (d, m) => {
+      const r = parentResidual(d.box, m.box, Pd.box, Pm.box);
+      return emission(d, m, d.box, m.box, P) + Math.min(5, Math.hypot(r.x, r.y) / P.transTau);
+    };
+    const r = assign(D, M, cost, d => gapCost(d, P) + 1.2, m => gapCost(m, P) + 1.2);
+    return { units: r.pairs.map(([d, m]) => mkUnit([d], [m])), delD: r.delA, insM: r.insB };
+  }
+
+  function viterbiAlign(D, M, Pd, Pm, P) {
+    const n = D.length, k = M.length;
+    if (!n || !k) return { units: [], delD: D.slice(), insM: M.slice() };
+    const K = n * k > 2500 ? Math.min(4, P.window) : P.window;
+    const INF = 1e18;
+    const maxMerge = !P.merges ? 1 : n * k > 2500 ? 2 : 3;
+    const types = [[1, 1]];
+    for (let q = 2; q <= maxMerge; q++) types.push([q, 1], [1, q]);
+    const T = types.length, S = (n + 1) * (k + 1);
+    const idx = (i, j) => i * (k + 1) + j;
+    const dp = types.map(() => new Float64Array(S).fill(INF));
+    const bpR = types.map(() => new Uint8Array(S));
+    const bpI = types.map(() => new Int32Array(S)), bpJ = types.map(() => new Int32Array(S)), bpT = types.map(() => new Int8Array(S));
+    const cache = types.map(() => new Array(S));
+    const Rv = new Float64Array(S).fill(INF), Rop = new Int8Array(S).fill(-1);
+    const gd = D.map(x => gapCost(x, P)), gm = M.map(x => gapCost(x, P));
+    const GD = new Float64Array(n + 1), GM = new Float64Array(k + 1);
+    for (let i = 0; i < n; i++) GD[i + 1] = GD[i] + gd[i];
+    for (let j = 0; j < k; j++) GM[j + 1] = GM[j] + gm[j];
+    function unit(t, i, j) {
+      const id = idx(i, j);
+      if (cache[t][id] !== undefined) return cache[t][id];
+      const [a, b] = types[t];
+      const dn = D.slice(i - a, i), mn = M.slice(j - b, j);
+      let u = null;
+      const many = a > 1 ? dn : b > 1 ? mn : null;
+      if (!many || plausibleMerge(many)) {
+        u = mkUnit(dn, mn);
+        const pr = parentResidual(u.db, u.mb, Pd.box, Pm.box);
+        const st = Math.min(4, Math.hypot(pr.x, pr.y) / P.transTau);
+        u.st = st;
+        let e = emission(rep(dn), rep(mn), u.db, u.mb, P) + P.posPrior * Math.min(1.5, st);
+        if (many) {
+          // A merge is only plausible when the union on one side has the shape of the single box
+          // on the other, after the page-wide font scale is taken out.
+          const ts = P.ts || { w: 0, h: 0 };
+          const lw = Math.abs(Math.log(Math.max(1, W_(u.mb)) / Math.max(1, W_(u.db))) - ts.w);
+          const lh = Math.abs(Math.log(Math.max(1, H_(u.mb)) / Math.max(1, H_(u.db))) - ts.h);
+          e += 0.35 * (many.length - 1) + 0.15 + 2.2 * (Math.max(0, lw - 0.12) + Math.max(0, lh - 0.12));
+        }
+        u.e = e;
+      }
+      cache[t][id] = u;
+      return u;
+    }
+    Rv[0] = 0;
+    for (let i = 0; i <= n; i++) {
+      for (let j = 0; j <= k; j++) {
+        const id = idx(i, j);
+        for (let t = 0; t < T; t++) {
+          const [a, b] = types[t];
+          if (i < a || j < b) continue;
+          const u = unit(t, i, j);
+          if (!u) continue;
+          const i0 = i - a, j0 = j - b;
+          let best = Rv[idx(i0, j0)] + u.st + (i0 > 0 || j0 > 0 ? P.resetPen : 0);
+          let fromR = 1, bi = 0, bj = 0, bt = 0;
+          for (let pi = i0; pi >= Math.max(1, i0 - K); pi--) {
+            for (let pj = j0; pj >= Math.max(1, j0 - K); pj--) {
+              const gaps = (GD[i0] - GD[pi]) + (GM[j0] - GM[pj]);
+              if (gaps >= best) continue;
+              const pid = idx(pi, pj);
+              for (let pt = 0; pt < T; pt++) {
+                const v = dp[pt][pid];
+                if (v >= INF) continue;
+                const c = v + gaps + transCost(cache[pt][pid], u, P, i0 > pi ? D.slice(pi, i0) : null, j0 > pj ? M.slice(pj, j0) : null);
+                if (c < best) { best = c; fromR = 0; bi = pi; bj = pj; bt = pt; }
+              }
+            }
+          }
+          dp[t][id] = u.e + best;
+          bpR[t][id] = fromR; bpI[t][id] = bi; bpJ[t][id] = bj; bpT[t][id] = bt;
+        }
+        if (i === 0 && j === 0) continue;
+        let rb = INF, op = -1;
+        if (i > 0 && Rv[idx(i - 1, j)] + gd[i - 1] < rb) { rb = Rv[idx(i - 1, j)] + gd[i - 1]; op = 0; }
+        if (j > 0 && Rv[idx(i, j - 1)] + gm[j - 1] < rb) { rb = Rv[idx(i, j - 1)] + gm[j - 1]; op = 1; }
+        for (let t = 0; t < T; t++) if (dp[t][id] < rb) { rb = dp[t][id]; op = 2 + t; }
+        Rv[id] = rb; Rop[id] = op;
+      }
+    }
+    const units = [], delD = [], insM = [];
+    let i = n, j = k, mode = 0, t = 0, guard = 0;
+    while ((i > 0 || j > 0) && guard++ < 100000) {
+      if (mode === 0) {
+        const op = Rop[idx(i, j)];
+        if (op === 0) { delD.push(D[i - 1]); i--; }
+        else if (op === 1) { insM.push(M[j - 1]); j--; }
+        else { mode = 1; t = op - 2; }
+      } else {
+        const id = idx(i, j);
+        units.push(cache[t][id]);
+        const [a, b] = types[t];
+        const i0 = i - a, j0 = j - b;
+        if (bpR[t][id]) { i = i0; j = j0; mode = 0; }
+        else {
+          const pi = bpI[t][id], pj = bpJ[t][id];
+          for (let x = pi; x < i0; x++) delD.push(D[x]);
+          for (let y = pj; y < j0; y++) insM.push(M[y]);
+          t = bpT[t][id]; i = pi; j = pj;
+        }
+      }
+    }
+    units.reverse();
+    return { units, delD, insM };
+  }
+
+  function rescue(res, Pd, Pm, P) {
+    if (!res.delD.length || !res.insM.length) return;
+    const cost = (d, m) => {
+      const r = parentResidual(d.box, m.box, Pd.box, Pm.box);
+      return emission(d, m, d.box, m.box, P) + 0.35 * Math.min(6, Math.hypot(r.x, r.y) / P.transTau);
+    };
+    const r = assign(res.delD, res.insM, cost, () => P.rescueMax, () => P.rescueMax);
+    for (const [d, m] of r.pairs) { const u = mkUnit([d], [m]); u.rescued = true; res.units.push(u); }
+    res.delD = r.delA; res.insM = r.insB;
+  }
+
+  /* ---------------- residual attribution ---------------- */
+  const KIND_NAME = { container: 'Container', shape: 'Shape', image: 'Image', text: 'Text', icon: 'Icon', rule: 'Rule', root: 'Page' };
+  function nodeName(n) {
+    if (!n) return '—';
+    const k = KIND_NAME[n.kind] || n.kind;
+    const s = `${Math.round(W_(n.box))}×${Math.round(H_(n.box))}`;
+    if (n.kind === 'text' && n.lines > 1) return `${k} · ${n.lines} lines`;
+    return `${k} ${s}`;
+  }
+  const unitName = (nodes) => nodes.length === 1 ? nodeName(nodes[0]) : `Text · ${nodes.length} blocks merged`;
+
+  function nearest(units, u, pred, score) {
+    let best = null, bs = -Infinity;
+    for (const v of units) if (v !== u && pred(v)) { const s = score(v); if (s > bs) { bs = s; best = v; } }
+    return best;
+  }
+
+  /* Minimum-cost arborescence (Chu–Liu/Edmonds). Node 0 is the parent; every
+     edge is "u's position is explained by reference r" with weight = the
+     residual it leaves. The optimum charges each unexplained displacement
+     exactly once and never lets two siblings exonerate each other. */
+  function edmonds(n, root, edges) {
+    const inE = new Array(n).fill(null);
+    for (const e of edges) if (e.to !== root && e.from !== e.to && (!inE[e.to] || e.w < inE[e.to].w)) inE[e.to] = e;
+    for (let v = 0; v < n; v++) if (v !== root && !inE[v]) return null;
+    const id = new Array(n).fill(-1), vis = new Array(n).fill(-1);
+    let cnt = 0;
+    for (let v = 0; v < n; v++) {
+      let u = v;
+      while (u !== root && vis[u] !== v && id[u] === -1) { vis[u] = v; u = inE[u].from; }
+      if (u !== root && id[u] === -1 && vis[u] === v) {
+        for (let x = inE[u].from; x !== u; x = inE[x].from) id[x] = cnt;
+        id[u] = cnt++;
+      }
+    }
+    if (!cnt) return inE;
+    for (let v = 0; v < n; v++) if (id[v] === -1) id[v] = cnt++;
+    const ne = [];
+    for (const e of edges) {
+      const a = id[e.from], b = id[e.to];
+      if (a !== b) ne.push({ from: a, to: b, w: e.w - inE[e.to].w, orig: e });
+    }
+    const sub = edmonds(cnt, id[root], ne);
+    if (!sub) return null;
+    const res = inE.slice();
+    for (let c = 0; c < cnt; c++) {
+      if (c === id[root] || !sub[c]) continue;
+      const e = sub[c].orig;
+      res[e.to] = e;
+    }
+    return res;
+  }
+
+  /* Flow chains: siblings in a row (x) or column (y) linked by regular gaps, e.g. nav links,
+     a card's stacked contents, a right-aligned footer group. Each chain is anchored at the end
+     that moved least; only that head may take its position from the parent, and position
+     propagates away from it. Off-chain references stay available, at a penalty, so strong
+     evidence can still override the prior. */
+  function flowChains(units, near, axis, PD, PM) {
+    const n = units.length;
+    const next = new Int32Array(n).fill(-1), prev = new Int32Array(n).fill(-1);
+    for (let k = 0; k < n; k++) {
+      const j = axis === 'x' ? near[k].ri : near[k].be;
+      if (j < 0) continue;
+      const back = axis === 'x' ? near[j].le : near[j].ab;
+      if (back !== k) continue;
+      const a = units[k].db, b = units[j].db;
+      const gap = axis === 'x' ? b.x0 - a.x1 : b.y0 - a.y1;
+      const size = axis === 'x' ? Math.min(H_(a), H_(b)) : Math.min(H_(a), H_(b));
+      if (gap <= Math.max(48, 3 * size)) { next[k] = j; prev[j] = k; }
+    }
+    const head = new Uint8Array(n), backward = new Uint8Array(n), linkedFwd = new Uint8Array(n), linkedBack = new Uint8Array(n);
+    for (let k = 0; k < n; k++) {
+      if (prev[k] >= 0) continue;
+      const chain = [k];
+      while (next[chain[chain.length - 1]] >= 0) chain.push(next[chain[chain.length - 1]]);
+      if (chain.length === 1) { head[k] = 1; continue; }
+      const f = units[chain[0]], l = units[chain[chain.length - 1]];
+      const dStart = axis === 'x'
+        ? Math.min(Math.abs((f.mb.x0 - PM.x0) - (f.db.x0 - PD.x0)), Math.abs((CX(f.mb) - CX(PM)) - (CX(f.db) - CX(PD))))
+        : Math.abs((f.mb.y0 - PM.y0) - (f.db.y0 - PD.y0));
+      const dEnd = axis === 'x' ? Math.abs((l.mb.x1 - PM.x1) - (l.db.x1 - PD.x1)) : Math.abs((l.mb.y1 - PM.y1) - (l.db.y1 - PD.y1));
+      const rev = dEnd + 1 < dStart;
+      head[rev ? chain[chain.length - 1] : chain[0]] = 1;
+      for (const c of chain) { backward[c] = rev ? 1 : 0; }
+      for (let i = 0; i < chain.length; i++) {
+        if (i > 0) linkedFwd[chain[i]] = 1;                 // has an in-chain predecessor
+        if (i < chain.length - 1) linkedBack[chain[i]] = 1; // has an in-chain successor
+      }
+    }
+    return { head, backward, linkedFwd, linkedBack, next };
+  }
+
+  function attributeLevel(units, missing, Pd, Pm, flow, extras, P0) {
+    extras = extras || [];
+    P0 = P0 || DEFAULTS;
+    const n = units.length;
+    if (!n) return;
+    const PD = Pd.box, PM = Pm.box, AL = 3, PEN = 15, BACK = 2;
+    const EX = [], EY = [];
+    const actX = u => ({ x0: u.mb.x0, cx: CX(u.mb), x1: u.mb.x1 });
+    const actY = u => ({ y0: u.mb.y0, cy: CY(u.mb), y1: u.mb.y1 });
+    const add = (E, from, to, anchor, exp, name, kind, pen) => {
+      const u = units[to - 1];
+      const a = (E === EX ? actX(u) : actY(u))[anchor];
+      // An element sitting exactly on a parent anchor is never charged; the chain prior only
+      // breaks ties between imperfect explanations.
+      if (kind === 'parent' && Math.abs(a - exp) <= 2) pen = 0;
+      E.push({ from, to, v: a - exp, w: Math.abs(a - exp) + (pen || 0), anchor, exp, name, kind });
+    };
+    const nm = v => unitName(v.d).toLowerCase();
+    let near = null, CXc = null, CYc = null;
+    if (flow) {
+      const pickNear = (k, pred, score) => {
+        let best = -1, bs = -Infinity;
+        units.forEach((v, j) => { if (j !== k && pred(v)) { const s = score(v); if (s > bs) { bs = s; best = j; } } });
+        return best;
+      };
+      const xo = (a, b) => OVL(a.x0, a.x1, b.x0, b.x1) > 0.15 * Math.min(W_(a), W_(b));
+      const yo = (a, b) => OVL(a.y0, a.y1, b.y0, b.y1) > 0.15 * Math.min(H_(a), H_(b));
+      near = units.map((u, k) => {
+        const d = u.db;
+        return {
+          ab: pickNear(k, v => v.db.y1 <= d.y0 + 2 && xo(v.db, d), v => v.db.y1),
+          be: pickNear(k, v => v.db.y0 >= d.y1 - 2 && xo(v.db, d), v => -v.db.y0),
+          le: pickNear(k, v => v.db.x1 <= d.x0 + 2 && yo(v.db, d), v => v.db.x1),
+          ri: pickNear(k, v => v.db.x0 >= d.x1 - 2 && yo(v.db, d), v => -v.db.x0),
+        };
+      });
+      CXc = flowChains(units, near, 'x', PD, PM);
+      CYc = flowChains(units, near, 'y', PD, PM);
+    }
+    // penalty for a reference along an axis, given the unit's chain role
+    const penParent = (C, k) => (C && !C.head[k] ? PEN : 0);
+    const penFwd = (C, k) => (C && C.linkedFwd[k] && !C.backward[k] ? 0 : C && C.linkedFwd[k] ? BACK : PEN);
+    const penBack = (C, k) => (C && C.linkedBack[k] && C.backward[k] ? 0 : C && C.linkedBack[k] ? PEN : PEN);
+    units.forEach((u, k) => {
+      const id = k + 1, d = u.db;
+      add(EX, 0, id, 'x0', PM.x0 + (d.x0 - PD.x0), 'parent left edge', 'parent', penParent(CXc, k));
+      add(EX, 0, id, 'cx', CX(PM) + (CX(d) - CX(PD)), 'parent center', 'parent', penParent(CXc, k));
+      add(EX, 0, id, 'x1', PM.x1 + (d.x1 - PD.x1), 'parent right edge', 'parent', penParent(CXc, k));
+      add(EY, 0, id, 'y0', PM.y0 + (d.y0 - PD.y0), 'parent top edge', 'parent', penParent(CYc, k));
+      add(EY, 0, id, 'cy', CY(PM) + (CY(d) - CY(PD)), 'parent middle', 'parent', penParent(CYc, k));
+      add(EY, 0, id, 'y1', PM.y1 + (d.y1 - PD.y1), 'parent bottom edge', 'parent', penParent(CYc, k));
+    });
+    if (flow) {
+      units.forEach((u, k) => {
+        const id = k + 1, d = u.db;
+        const { ab, be, le, ri } = near[k];
+        if (ab >= 0) {
+          const a = units[ab], f = ab + 1;
+          add(EY, f, id, 'y0', a.mb.y1 + (d.y0 - a.db.y1), `flows below ${nm(a)}`, 'flow', penFwd(CYc, k));
+          if (Math.abs(d.x0 - a.db.x0) <= AL) add(EX, f, id, 'x0', a.mb.x0 + (d.x0 - a.db.x0), `left-aligned with ${nm(a)}`, 'align');
+          if (Math.abs(CX(d) - CX(a.db)) <= AL) add(EX, f, id, 'cx', CX(a.mb) + (CX(d) - CX(a.db)), `centered on ${nm(a)}`, 'align');
+          if (Math.abs(d.x1 - a.db.x1) <= AL) add(EX, f, id, 'x1', a.mb.x1 + (d.x1 - a.db.x1), `right-aligned with ${nm(a)}`, 'align');
+          const gm = missing.filter(m => m.box.y0 >= a.db.y1 - 2 && m.box.y1 <= d.y0 + 2 && OVL(m.box.x0, m.box.x1, d.x0, d.x1) > 0);
+          if (gm.length) {
+            const top = Math.min(...gm.map(m => m.box.y0)), bot = Math.max(...gm.map(m => m.box.y1));
+            add(EY, f, id, 'y0', a.mb.y1 + (top - a.db.y1), 'closes the gap of a missing element', 'collapse');
+            add(EY, f, id, 'y0', a.mb.y1 + (d.y0 - bot), 'closes the gap of a missing element', 'collapse');
+          }
+          const ge = extras.filter(m => m.box.y0 >= a.mb.y1 - 2 && m.box.y1 <= u.mb.y0 + 2 && OVL(m.box.x0, m.box.x1, u.mb.x0, u.mb.x1) > 0);
+          if (ge.length) {
+            const bot = Math.max(...ge.map(m => m.box.y1));
+            add(EY, f, id, 'y0', bot + (d.y0 - a.db.y1), 'flows below an extra element', 'collapse');
+          }
+        } else {
+          const gm = missing.filter(m => m.box.y1 <= d.y0 + 2 && OVL(m.box.x0, m.box.x1, d.x0, d.x1) > 0);
+          if (gm.length) {
+            const top = Math.min(...gm.map(m => m.box.y0));
+            add(EY, 0, id, 'y0', PM.y0 + (top - PD.y0), 'took the place of a missing element', 'collapse');
+          }
+        }
+        if (be >= 0) {
+          const b = units[be], f = be + 1;
+          add(EY, f, id, 'y1', b.mb.y0 - (b.db.y0 - d.y1), `sits above ${nm(b)}`, 'flow', penBack(CYc, k));
+          if (Math.abs(d.x0 - b.db.x0) <= AL) add(EX, f, id, 'x0', b.mb.x0 + (d.x0 - b.db.x0), `left-aligned with ${nm(b)}`, 'align', BACK);
+          if (Math.abs(CX(d) - CX(b.db)) <= AL) add(EX, f, id, 'cx', CX(b.mb) + (CX(d) - CX(b.db)), `centered on ${nm(b)}`, 'align', BACK);
+          if (Math.abs(d.x1 - b.db.x1) <= AL) add(EX, f, id, 'x1', b.mb.x1 + (d.x1 - b.db.x1), `right-aligned with ${nm(b)}`, 'align', BACK);
+        }
+        if (le >= 0) {
+          const l = units[le], f = le + 1;
+          add(EX, f, id, 'x0', l.mb.x1 + (d.x0 - l.db.x1), `follows ${nm(l)}`, 'flow', penFwd(CXc, k));
+          if (Math.abs(d.y0 - l.db.y0) <= AL) add(EY, f, id, 'y0', l.mb.y0 + (d.y0 - l.db.y0), `top-aligned with ${nm(l)}`, 'align');
+          if (Math.abs(CY(d) - CY(l.db)) <= AL) add(EY, f, id, 'cy', CY(l.mb) + (CY(d) - CY(l.db)), `middle-aligned with ${nm(l)}`, 'align');
+          if (Math.abs(d.y1 - l.db.y1) <= AL) add(EY, f, id, 'y1', l.mb.y1 + (d.y1 - l.db.y1), `bottom-aligned with ${nm(l)}`, 'align');
+          const gm = missing.filter(m => m.box.x0 >= l.db.x1 - 2 && m.box.x1 <= d.x0 + 2 && OVL(m.box.y0, m.box.y1, d.y0, d.y1) > 0);
+          if (gm.length) {
+            const lf = Math.min(...gm.map(m => m.box.x0)), rt = Math.max(...gm.map(m => m.box.x1));
+            add(EX, f, id, 'x0', l.mb.x1 + (lf - l.db.x1), 'closes the gap of a missing element', 'collapse');
+            add(EX, f, id, 'x0', l.mb.x1 + (d.x0 - rt), 'closes the gap of a missing element', 'collapse');
+          }
+        }
+        if (ri >= 0) {
+          const r = units[ri], f = ri + 1;
+          add(EX, f, id, 'x1', r.mb.x0 - (r.db.x0 - d.x1), `precedes ${nm(r)}`, 'flow', penBack(CXc, k));
+          if (Math.abs(d.y0 - r.db.y0) <= AL) add(EY, f, id, 'y0', r.mb.y0 + (d.y0 - r.db.y0), `top-aligned with ${nm(r)}`, 'align', BACK);
+          if (Math.abs(CY(d) - CY(r.db)) <= AL) add(EY, f, id, 'cy', CY(r.mb) + (CY(d) - CY(r.db)), `middle-aligned with ${nm(r)}`, 'align', BACK);
+          if (Math.abs(d.y1 - r.db.y1) <= AL) add(EY, f, id, 'y1', r.mb.y1 + (d.y1 - r.db.y1), `bottom-aligned with ${nm(r)}`, 'align', BACK);
+        }
+      });
+    }
+    const cx = edmonds(n + 1, 0, EX), cy = edmonds(n + 1, 0, EY);
+    if (flow) {
+      // Every in-chain gap is a layout constraint. If one changed beyond tolerance and neither
+      // neighbour's chosen reference runs through it, charge the element after it (in the chain's
+      // direction) through that gap, so a coincidence elsewhere cannot hide it.
+      const enforce = (C, E, chosen, flowWord, backWord) => {
+        for (let k = 0; k < n; k++) {
+          const j = C.next[k];
+          if (j < 0) continue;
+          const succ = C.backward[k] ? k : j, pred = C.backward[k] ? j : k;
+          const uses = e => e && e.from === pred + 1 && e.to === succ + 1 && e.kind === 'flow';
+          const usesRev = e => e && e.from === succ + 1 && e.to === pred + 1 && e.kind === 'flow';
+          if (uses(chosen[succ + 1]) || usesRev(chosen[pred + 1])) continue;
+          // Only when the element is explained by the neighbour on its far side (against the
+          // chain's direction); parent anchors and alignments are legitimate (flex spacers, pins).
+          const cur = chosen[succ + 1];
+          if (!cur || cur.kind !== 'flow' || cur.from === pred + 1) continue;
+          const g = E.find(e => e.from === pred + 1 && e.to === succ + 1 && e.kind === 'flow');
+          const tol = P0.posTol * (KIND_GROUP[units[succ].d[0].kind] === 'ink' ? P0.textPosMul : 1);
+          if (g && Math.abs(g.v) > tol && Math.abs(g.v) > Math.abs(cur.v) + tol) {
+            chosen[succ + 1] = Object.assign({}, g, { name: g.name + ' (gap changed)' });
+          }
+        }
+      };
+      enforce(CXc, EX, cx); enforce(CYc, EY, cy);
+    }
+    units.forEach((u, k) => {
+      u.rx = cx[k + 1]; u.ry = cy[k + 1];
+      u.rx.refUnit = u.rx.from ? units[u.rx.from - 1] : null;
+      u.ry.refUnit = u.ry.from ? units[u.ry.from - 1] : null;
+    });
+  }
+
+  /* ---------------- severity ---------------- */
+  const LEVEL = s => (s >= 2.5 ? 'major' : s >= 1 ? 'minor' : 'ok');
+  function sizeCheck(u, P, contentExplained, missingKids) {
+    const d = u.d[0], db = u.db, mb = u.mb;
+    const dw = W_(mb) - W_(db), dh = H_(mb) - H_(db);
+    const ink = KIND_GROUP[d.kind] === 'ink' || u.d.length > 1;
+    if (ink) {
+      // Text is compared by ink mass (edge pixels), which survives reflow: the same words wrapped
+      // onto more lines keep their mass. Single-line blocks also compare height (≈ font size).
+      const pd = u.d.reduce((a, n) => a + (n.px || AREA(n.box) * 0.3), 0), pm = u.m.reduce((a, n) => a + (n.px || AREA(n.box) * 0.3), 0);
+      const lr = Math.log(Math.max(1, pm) / Math.max(1, pd)) - (P.ts ? P.ts.m : 0);
+      const sMass = Math.max(0, Math.abs(lr) - Math.log(1 + P.textSizeTol)) / Math.log(1.25);
+      let sH = 0;
+      if (u.d.length === 1 && u.m.length === 1 && u.d[0].lines === 1 && u.m[0].lines === 1) {
+        sH = Math.max(0, Math.abs(Math.log(H_(mb) / H_(db)) - (P.ts ? P.ts.h : 0)) - Math.log(1.22)) / Math.log(1.15);
+      }
+      const s = Math.max(sMass, sH);
+      let note;
+      if (sH > sMass) note = `glyphs ${H_(mb) > H_(db) ? 'taller' : 'shorter'} (${Math.round(H_(db))}→${Math.round(H_(mb))}px line)`;
+      else note = lr > 0 ? `text ${Math.round((Math.exp(lr) - 1) * 100)}% heavier` : `text ${Math.round((1 - Math.exp(lr)) * 100)}% lighter`;
+      const reflow = (u.d[0].lines || 1) !== (u.m[0].lines || 1);
+      return { s, dw, dh, note, explained: s < 1 ? (reflow ? 'reflowed, same amount of text' : 'within text tolerance') : '' };
+    }
+    const tw = Math.max(P.sizeTol, 0.05 * W_(db)), th = Math.max(P.sizeTol, 0.05 * H_(db));
+    let sx = Math.abs(dw) / tw, sy = Math.abs(dh) / th, explained = '';
+    if (contentExplained && u.kids && u.kids.length) {
+      // Height may follow content: the change is excused by the growth of the matched children's
+      // extent, plus any shift of the topmost child that is already charged to that child.
+      const Ud = UNIONS(u.kids.map(k => k.db)), Um = UNIONS(u.kids.map(k => k.mb));
+      const top = u.kids.reduce((a, k) => (k.mb.y0 < a.mb.y0 ? k : a));
+      const rTop = top.ry && top.ry.kind === 'parent' && top.ry.anchor === 'y0' ? top.ry.v : 0;
+      const dContent = H_(Um) - H_(Ud);
+      const alt = [Math.abs(dh - dContent - rTop)];
+      if (missingKids && missingKids.length) {
+        const span = H_(UNIONS(missingKids.map(n => n.box)));
+        for (const g of [0, 8, 12, 16, 24]) alt.push(Math.abs(dh - dContent - rTop + span + g));
+      }
+      const ry = Math.min(...alt);
+      if (ry / th < sy) { sy = ry / th; if (Math.abs(dh) > th) explained = 'height follows content'; }
+      // Width may hug a single label (buttons, pills, badges).
+      // Width of a single-label container (button, pill, badge) may be fixed or hug its label;
+      // any change between those two is excused.
+      if (u.kids.length === 1 && KIND_GROUP[u.kids[0].d[0].kind] === 'ink') {
+        const dc = W_(Um) - W_(Ud);
+        const lo = Math.min(0, dc), hi = Math.max(0, dc);
+        const rx = dw < lo ? lo - dw : dw > hi ? dw - hi : 0;
+        if (rx / tw < sx) { sx = rx / tw; if (Math.abs(dw) > tw) explained = explained ? explained + ', width follows its label' : 'width follows its label'; }
+      }
+    }
+    const parts = [];
+    if (Math.abs(dw) >= 2) parts.push(`width ${dw > 0 ? '+' : '−'}${Math.abs(Math.round(dw))}px`);
+    if (Math.abs(dh) >= 2) parts.push(`height ${dh > 0 ? '+' : '−'}${Math.abs(Math.round(dh))}px`);
+    return { s: Math.max(sx, sy), dw, dh, note: parts.join(', '), explained };
+  }
+  function fmtVec(x, y) {
+    const p = [];
+    if (Math.abs(y) >= 1.5) p.push(`${Math.round(Math.abs(y))}px ${y > 0 ? 'down' : 'up'}`);
+    if (Math.abs(x) >= 1.5) p.push(`${Math.round(Math.abs(x))}px ${x > 0 ? 'right' : 'left'}`);
+    return p.join(', ') || 'in place';
+  }
+  function expectedBox(db, rx, ry) {
+    const x0 = rx.anchor === 'x0' ? rx.exp : rx.anchor === 'cx' ? rx.exp - W_(db) / 2 : rx.exp - W_(db);
+    const y0 = ry.anchor === 'y0' ? ry.exp : ry.anchor === 'cy' ? ry.exp - H_(db) / 2 : ry.exp - H_(db);
+    return B(x0, y0, x0 + W_(db), y0 + H_(db));
+  }
+
+  function scoreUnit(u, Pd, Pm, ctx, depth, missingKids) {
+    const P = ctx.P;
+    const mb = u.mb, db = u.db;
+    const rx = u.rx, ry = u.ry;
+    const d = u.d[0], m = u.m[0];
+    const ink = KIND_GROUP[d.kind] === 'ink' || u.d.length > 1;
+    const ptol = P.posTol * (ink ? P.textPosMul : 1);
+    const sPos = Math.hypot(rx.v, ry.v) / ptol;
+    const size = sizeCheck(u, P, ctx.flow, missingKids);
+    const ctol = ink ? P.textColorTol : P.colorTol;
+    const de = d.color && m.color ? dE(rep(u.d).color || d.color, rep(u.m).color || m.color) : 0;
+    const sCol = de > ctol ? 1 + (de - ctol) / 12 : de / ctol * 0.9;
+    let sShape = 0;
+    if (u.d.length === 1 && u.m.length === 1 && d.solidity && m.solidity && Math.min(W_(db), H_(db)) >= 16) {
+      sShape = Math.max(0, Math.abs(d.solidity - m.solidity) - 0.05) / 0.04;
+    }
+    const comps = [['position', sPos], ['size', size.s], ['color', sCol], ['shape', sShape]];
+    comps.sort((a, b) => b[1] - a[1]);
+    const sev = comps[0][1];
+    const top = comps[0][0];
+    let title;
+    if (sev < 1) title = 'Matches';
+    else if (top === 'position') title = `Moved ${fmtVec(rx.v, ry.v)}`;
+    else if (top === 'size') title = size.note ? size.note[0].toUpperCase() + size.note.slice(1) : 'Size differs';
+    else if (top === 'color') title = `${ink ? 'Text color' : 'Fill color'} off (ΔE ${Math.round(de)})`;
+    else title = 'Shape differs (corners or outline)';
+    const inherited = { dx: Pm.box.x0 - Pd.box.x0, dy: Pm.box.y0 - Pd.box.y0 };
+    const abs = { dx: mb.x0 - db.x0, dy: mb.y0 - db.y0 };
+    const eBox = expectedBox(db, rx, ry);
+    const issues = comps.filter(c => c[1] >= 1).map(c => c[0]);
+    return {
+      type: sev < 1 ? 'match' : top, sev, level: LEVEL(sev), title, issues,
+      name: unitName(u.d), dBox: db, mBox: mb, eBox,
+      dNodes: u.d, mNodes: u.m, depth, rescued: !!u.rescued, merged: u.d.length + u.m.length > 2,
+      decomp: {
+        abs, inherited,
+        explained: { dx: abs.dx - inherited.dx - rx.v, dy: abs.dy - inherited.dy - ry.v },
+        residual: { dx: rx.v, dy: ry.v },
+        refX: rx.name, refY: ry.name, refXKind: rx.kind, refYKind: ry.kind,
+      },
+      size, color: { d: rep(u.d).color || d.color, m: rep(u.m).color || m.color, de }, shape: { d: d.solidity, m: m.solidity, s: sShape },
+      parts: { position: sPos, size: size.s, color: sCol, shape: sShape },
+    };
+  }
+
+  /* ---------------- pixel verification of missing / extra ---------------- */
+  /* Strong-ink pixels of `img` inside `box`, ignoring pixels covered by `skip` boxes. */
+  function inkIn(img, box, bg, skip, T) {
+    if (!img || !box) return 0;
+    const W = img.width, H = img.height, d = img.data;
+    const x0 = clamp(Math.floor(box.x0), 0, W), x1 = clamp(Math.ceil(box.x1), 0, W);
+    const y0 = clamp(Math.floor(box.y0), 0, H), y1 = clamp(Math.ceil(box.y1), 0, H);
+    let n = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      let covered = false;
+      for (const b of skip) if (x >= b.x0 && x < b.x1 && y >= b.y0 && y < b.y1) { covered = true; break; }
+      if (covered) continue;
+      const i = (y * W + x) * 4;
+      if (Math.max(Math.abs(d[i] - bg[0]), Math.abs(d[i + 1] - bg[1]), Math.abs(d[i + 2] - bg[2])) > 2.5 * T) n++;
+    }
+    return n;
+  }
+  /* Before calling something missing, look where it should be: if the other render has
+     comparable ink there that no matched sibling accounts for, the element is present but
+     fused with a neighbour by segmentation (tight padding, touching glyphs). */
+  function presentInPixels(n, at, imgSelf, imgOther, fillSelf, fillOther, siblingsOther, P) {
+    const own = inkIn(imgSelf, n.box, fillSelf, [], P.edgeT);
+    if (own < 12) return false;
+    const there = inkIn(imgOther, at, fillOther, siblingsOther, P.edgeT);
+    return there >= 0.5 * own;
+  }
+
+  /* ---------------- tree runner ---------------- */
+  function frameContrast(n) {
+    const c = n.fill || n.color, b = n.bg;
+    return c && b ? dE(c, b) : 20;
+  }
+  function runTree(segD, segM, ctx) {
+    const P = ctx.P, out = [];
+    const level = (Dk, Mk, Pd, Pm, depth) => {
+      let D = xyOrder(Dk), M = xyOrder(Mk), res;
+      for (let round = 0; round < 5; round++) {
+        res = ctx.align(D, M, Pd, Pm, P);
+        if (P.rescue) rescue(res, Pd, Pm, P);
+        if (!P.flatten) break;
+        const fd = res.delD.filter(n => n.children && n.children.length);
+        const fm = res.insM.filter(n => n.children && n.children.length);
+        if (!fd.length && !fm.length) break;
+        for (const n of fd) {
+          const s = frameContrast(n) > 14 ? 2.6 : 1.4;
+          out.push({ type: 'frame-missing', sev: s, level: LEVEL(s), title: 'Frame missing (contents found)', name: nodeName(n), dBox: n.box, mBox: null, eBox: SHIFT(n.box, Pm.box.x0 - Pd.box.x0, Pm.box.y0 - Pd.box.y0), dNodes: [n], mNodes: [], depth });
+        }
+        for (const n of fm) {
+          const s = frameContrast(n) > 14 ? 2.6 : 1.4;
+          out.push({ type: 'frame-extra', sev: s, level: LEVEL(s), title: 'Extra frame around contents', name: nodeName(n), dBox: null, mBox: n.box, eBox: null, dNodes: [], mNodes: [n], depth });
+        }
+        D = xyOrder(D.flatMap(n => (fd.includes(n) ? n.children : [n])));
+        M = xyOrder(M.flatMap(n => (fm.includes(n) ? n.children : [n])));
+      }
+      const units = res.units;
+      // recurse first so containers know which children matched (content-explained size)
+      for (const u of units) {
+        if (u.d.length === 1 && u.m.length === 1 && (u.d[0].children.length || u.m[0].children.length)) {
+          u.sub = level(u.d[0].children, u.m[0].children, u.d[0], u.m[0], depth + 1);
+          u.kids = u.sub.units;
+        }
+      }
+      attributeLevel(units, res.delD, Pd, Pm, ctx.flow, res.insM, P);
+      for (const u of units) out.push(scoreUnit(u, Pd, Pm, ctx, depth, u.sub ? u.sub.delD : null));
+      for (const n of res.delD) {
+        let e = SHIFT(n.box, Pm.box.x0 - Pd.box.x0, Pm.box.y0 - Pd.box.y0);
+        if (ctx.flow) {
+          const a = nearest(units, null, v => v.db.y1 <= n.box.y0 + 2 && OVL(v.db.x0, v.db.x1, n.box.x0, n.box.x1) > 0, v => v.db.y1);
+          if (a) e = SHIFT(n.box, a.mb.x0 - a.db.x0, a.mb.y1 - a.db.y1);
+        }
+        if (ctx.verify && presentInPixels(n, e, ctx.imgD, ctx.imgM, Pd.fill || Pd.color, Pm.fill || Pm.color, units.map(v => v.mb), P)) continue;
+        const big = AREA(n.box) >= 250 || n.kind === 'text';
+        const s = big ? 3 : 1.3;
+        out.push({ type: 'missing', sev: s, level: LEVEL(s), title: 'Missing in implementation', name: nodeName(n), dBox: n.box, mBox: null, eBox: e, dNodes: [n], mNodes: [], depth });
+      }
+      for (const n of res.insM) {
+        let e = SHIFT(n.box, Pd.box.x0 - Pm.box.x0, Pd.box.y0 - Pm.box.y0);
+        if (ctx.flow) {
+          const a = nearest(units, null, v => v.mb.y1 <= n.box.y0 + 2 && OVL(v.mb.x0, v.mb.x1, n.box.x0, n.box.x1) > 0, v => v.mb.y1);
+          if (a) e = SHIFT(n.box, a.db.x0 - a.mb.x0, a.db.y1 - a.mb.y1);
+        }
+        if (ctx.verify && presentInPixels(n, e, ctx.imgM, ctx.imgD, Pm.fill || Pm.color, Pd.fill || Pd.color, units.map(v => v.db), P)) continue;
+        const big = AREA(n.box) >= 250 || n.kind === 'text';
+        const s = big ? 2.6 : 1.2;
+        out.push({ type: 'extra', sev: s, level: LEVEL(s), title: 'Not in the design', name: nodeName(n), dBox: null, mBox: n.box, eBox: null, dNodes: [], mNodes: [n], depth });
+      }
+      return { units, delD: res.delD, insM: res.insM };
+    };
+    level(segD.root.children, segM.root.children, segD.root, segM.root, 1);
+    return out;
+  }
+
+  function runFlat(segD, segM, ctx) {
+    const P = ctx.P, out = [];
+    const D = segD.nodes, M = segM.nodes, PD = segD.root, PM = segM.root;
+    const cost = (d, m) => {
+      const r = parentResidual(d.box, m.box, PD.box, PM.box);
+      return emission(d, m, d.box, m.box, P) + Math.min(6, Math.hypot(r.x, r.y) / P.transTau);
+    };
+    const r = assign(D, M, cost, d => gapCost(d, P) + 1.2, m => gapCost(m, P) + 1.2);
+    const units = r.pairs.map(([d, m]) => mkUnit([d], [m]));
+    attributeLevel(units, [], PD, PM, false);
+    for (const u of units) out.push(scoreUnit(u, PD, PM, ctx, u.d[0].depth || 1, null));
+    for (const n of r.delA) {
+      const s = AREA(n.box) >= 250 || n.kind === 'text' ? 3 : 1.3;
+      out.push({ type: 'missing', sev: s, level: LEVEL(s), title: 'Missing in implementation', name: nodeName(n), dBox: n.box, mBox: null, eBox: n.box, dNodes: [n], mNodes: [], depth: n.depth });
+    }
+    for (const n of r.insB) {
+      const s = AREA(n.box) >= 250 || n.kind === 'text' ? 2.6 : 1.2;
+      out.push({ type: 'extra', sev: s, level: LEVEL(s), title: 'Not in the design', name: nodeName(n), dBox: null, mBox: n.box, eBox: null, dNodes: [], mNodes: [n], depth: n.depth });
+    }
+    return out;
+  }
+
+  /* ---------------- pixel baselines ---------------- */
+  function blobs(flag, W, H, strength, cell) {
+    const gw = Math.ceil(W / cell), gh = Math.ceil(H / cell);
+    const cnt = new Float32Array(gw * gh), sum = new Float32Array(gw * gh);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (flag[i]) { const g = ((y / cell) | 0) * gw + ((x / cell) | 0); cnt[g]++; sum[g] += strength[i]; }
+    }
+    const on = new Uint8Array(gw * gh);
+    for (let g = 0; g < gw * gh; g++) on[g] = cnt[g] >= 3 ? 1 : 0;
+    const seen = new Uint8Array(gw * gh), out = [];
+    for (let s = 0; s < gw * gh; s++) {
+      if (!on[s] || seen[s]) continue;
+      const st = [s]; seen[s] = 1;
+      let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1, c = 0, sm = 0;
+      while (st.length) {
+        const g = st.pop(); const gx = g % gw, gy = (g - gx) / gw;
+        x0 = Math.min(x0, gx); x1 = Math.max(x1, gx); y0 = Math.min(y0, gy); y1 = Math.max(y1, gy);
+        c += cnt[g]; sm += sum[g];
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+          const nx = gx + dx, ny = gy + dy;
+          if (nx < 0 || ny < 0 || nx >= gw || ny >= gh) continue;
+          const q = ny * gw + nx;
+          if (on[q] && !seen[q]) { seen[q] = 1; st.push(q); }
+        }
+      }
+      out.push({ box: B(x0 * cell, y0 * cell, Math.min(W, (x1 + 1) * cell), Math.min(H, (y1 + 1) * cell)), px: c, mean: sm / c });
+    }
+    return out;
+  }
+  function runPixel(imgD, imgM, ctx) {
+    const P = ctx.P, W = imgD.width, H = imgD.height, a = imgD.data, b = imgM.data;
+    const N = W * H, flag = new Uint8Array(N), str = new Float32Array(N);
+    let nf = 0;
+    for (let i = 0; i < N; i++) {
+      const k = i * 4;
+      const d = Math.max(Math.abs(a[k] - b[k]), Math.abs(a[k + 1] - b[k + 1]), Math.abs(a[k + 2] - b[k + 2]));
+      str[i] = d / 255;
+      if (d > P.pixT) { flag[i] = 1; nf++; }
+    }
+    const out = blobs(flag, W, H, str, 6).map(bl => {
+      const s = 1 + Math.min(3, bl.mean * 4 * Math.min(1, bl.px / 400));
+      return { type: 'pixel', sev: s, level: LEVEL(s), title: `${bl.px} pixels differ`, name: `Region ${Math.round(W_(bl.box))}×${Math.round(H_(bl.box))}`, dBox: bl.box, mBox: bl.box, eBox: null, dNodes: [], mNodes: [], depth: 0 };
+    });
+    return { findings: out, heat: { W, H, v: str, flag }, score: 100 * (1 - nf / N) };
+  }
+  function runSSIM(imgD, imgM, ctx) {
+    const P = ctx.P, W = imgD.width, H = imgD.height, N = W * H;
+    const L = (img) => { const o = new Float64Array(N), d = img.data; for (let i = 0; i < N; i++) o[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; return o; };
+    const x = L(imgD), y = L(imgM);
+    const W1 = W + 1, I = n => new Float64Array(W1 * (H + 1));
+    const Sx = I(), Sy = I(), Sxx = I(), Syy = I(), Sxy = I();
+    for (let r = 0; r < H; r++) {
+      let ax = 0, ay = 0, axx = 0, ayy = 0, axy = 0;
+      for (let c = 0; c < W; c++) {
+        const i = r * W + c, xv = x[i], yv = y[i];
+        ax += xv; ay += yv; axx += xv * xv; ayy += yv * yv; axy += xv * yv;
+        const o = (r + 1) * W1 + c + 1, u = r * W1 + c + 1;
+        Sx[o] = Sx[u] + ax; Sy[o] = Sy[u] + ay; Sxx[o] = Sxx[u] + axx; Syy[o] = Syy[u] + ayy; Sxy[o] = Sxy[u] + axy;
+      }
+    }
+    const rad = 3, C1 = (0.01 * 255) ** 2, C2 = (0.03 * 255) ** 2;
+    const ss = new Float32Array(N), flag = new Uint8Array(N), str = new Float32Array(N);
+    let tot = 0;
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const r0 = Math.max(0, r - rad), r1 = Math.min(H, r + rad + 1), c0 = Math.max(0, c - rad), c1 = Math.min(W, c + rad + 1);
+      const n = (r1 - r0) * (c1 - c0);
+      const box = S => S[r1 * W1 + c1] - S[r0 * W1 + c1] - S[r1 * W1 + c0] + S[r0 * W1 + c0];
+      const mx = box(Sx) / n, my = box(Sy) / n;
+      const vx = box(Sxx) / n - mx * mx, vy = box(Syy) / n - my * my, cxy = box(Sxy) / n - mx * my;
+      const v = ((2 * mx * my + C1) * (2 * cxy + C2)) / ((mx * mx + my * my + C1) * (vx + vy + C2));
+      const i = r * W + c;
+      ss[i] = v; tot += v;
+      str[i] = clamp((1 - v) / 2, 0, 1);
+      if (v < P.ssimT) flag[i] = 1;
+    }
+    const out = blobs(flag, W, H, str, 6).map(bl => {
+      const s = 1 + Math.min(3, bl.mean * 6 * Math.min(1, bl.px / 400));
+      return { type: 'pixel', sev: s, level: LEVEL(s), title: `Low structural similarity`, name: `Region ${Math.round(W_(bl.box))}×${Math.round(H_(bl.box))}`, dBox: bl.box, mBox: bl.box, eBox: null, dNodes: [], mNodes: [], depth: 0 };
+    });
+    return { findings: out, heat: { W, H, v: str, flag }, score: 100 * tot / N };
+  }
+
+  /* ---------------- registry ---------------- */
+  const ALGOS = [
+    { id: 'pixel', name: 'Pixel Δ', short: 'Pixel Δ', family: 'pixel', blurb: 'Per-pixel max-channel difference, blobbed into regions. The baseline everyone starts with: fonts and any shift light up everything.' },
+    { id: 'ssim', name: 'SSIM map', short: 'SSIM', family: 'pixel', blurb: 'Windowed structural similarity on luminance. Smarter about contrast, still blind to structure: a 24px shift is a full-page failure.' },
+    { id: 'flat', name: 'Flat boxes', short: 'Flat', family: 'box', blurb: 'Segment both renders, flatten every box, solve one global assignment, score absolute coordinates. Every descendant of a moved element is charged again.' },
+    { id: 'tree', name: 'Tree · Hungarian', short: 'Tree', family: 'box', blurb: 'Match level by level inside matched parents, score children relative to their parent. Removes parent double jeopardy; siblings in a flow still cascade.' },
+    { id: 'viterbi', name: 'Tree · Viterbi', short: 'Viterbi', family: 'box', blurb: 'Same tree, but each level is a monotone Viterbi alignment over reading order with flow-aware transitions, skips and 2:1 text merges. Residuals still parent-relative.' },
+    { id: 'viterbi-flow', name: 'Tree · Viterbi + flow', short: 'Viterbi + flow', family: 'box', blurb: 'Full method. Each element is charged only for the displacement no layout reference explains: its parent, the sibling it flows after, a neighbour it was aligned with, the gap a missing sibling left. Rows and columns form flow chains anchored where they moved least. Containers may grow with their content and text may reflow.' },
+  ];
+
+  function run(algoId, segD, segM, imgD, imgM, Pin) {
+    const P = Object.assign({}, DEFAULTS, Pin || {});
+    const t0 = performance.now();
+    let findings, heat = null, score = null;
+    if (algoId === 'pixel' || algoId === 'ssim') {
+      const r = algoId === 'pixel' ? runPixel(imgD, imgM, { P }) : runSSIM(imgD, imgM, { P });
+      findings = r.findings; heat = r.heat; score = r.score;
+    } else {
+      const pass = Q => algoId === 'flat'
+        ? runFlat(segD, segM, { P: Q, flow: false })
+        : runTree(segD, segM, { P: Q, flow: algoId === 'viterbi-flow', verify: algoId === 'viterbi-flow', imgD, imgM, align: algoId === 'tree' ? hungarianAlign : viterbiAlign });
+      findings = pass(P);
+      const ts = estimateTextScale(findings);
+      if (ts) { P.ts = ts; findings = pass(P); }
+    }
+    findings.forEach((f, i) => { f.id = i + 1; });
+    const flagged = findings.filter(f => f.level !== 'ok');
+    if (score === null) {
+      // area-weighted conformance over design leaves + extras
+      let tot = 0, bad = 0;
+      for (const f of findings) {
+        const b = f.dBox || f.mBox;
+        const w = Math.sqrt(Math.max(16, AREA(b)));
+        tot += w;
+        bad += w * clamp((f.sev - 0.8) / 2.5, 0, 1);
+      }
+      score = tot ? 100 * (1 - bad / tot) : 100;
+    }
+    const counts = { major: 0, minor: 0, ok: 0, missing: 0, extra: 0 };
+    for (const f of findings) {
+      counts[f.level]++;
+      if (f.level !== 'ok' && (f.type === 'missing' || f.type === 'frame-missing')) counts.missing++;
+      if (f.level !== 'ok' && (f.type === 'extra' || f.type === 'frame-extra')) counts.extra++;
+    }
+    return { algo: algoId, findings, flagged, heat, score, counts, ms: performance.now() - t0, P };
+  }
+
+  /* ---------------- evaluation ---------------- */
+  function overlapsGT(b, g) {
+    const I = INTER(GROW(b, 1), GROW(g, 6));
+    if (!I) return false;
+    const a = AREA(I);
+    return a >= 0.5 * AREA(b) || a >= 0.5 * AREA(g);
+  }
+  function evaluate(findings, gt) {
+    const flagged = findings.filter(f => f.level !== 'ok');
+    const hit = new Set();
+    let tp = 0;
+    for (const f of flagged) {
+      let any = false;
+      gt.forEach((g, gi) => {
+        const boxes = g.space === 'design' ? [f.dBox, f.eBox] : [f.mBox, f.eBox, f.type === 'missing' ? f.dBox : null];
+        if (boxes.some(b => b && overlapsGT(b, g.box))) { any = true; hit.add(gi); }
+      });
+      if (any) tp++;
+      f.gtHit = any;
+    }
+    const n = gt.length;
+    const recall = n ? hit.size / n : null;
+    const precision = flagged.length ? tp / flagged.length : (n ? 0 : 1);
+    const f1 = n && (recall + precision) > 0 ? 2 * recall * precision / (recall + precision) : null;
+    return { gt: n, found: hit.size, flagged: flagged.length, tp, fp: flagged.length - tp, recall, precision, f1, hit };
+  }
+
+  return {
+    DEFAULTS, ALGOS, rasterize, nativeSize, segment, run, groundTruth, evaluate, nodeName,
+    geom: { B, W_, H_, CX, CY, AREA, UNION, INTER, SHIFT, GROW }, color: { dE, hex },
+  };
+})();
+if (typeof window !== 'undefined') window.Engine = Engine;
+
+</script>
+<script>
+/* =====================================================================
+   Presets: Figma-style SVG designs + hand-built HTML implementations.
+   Bugs are planted in the HTML and tagged with data-bug="…" — the tag is
+   read only by the benchmark's ground-truth pass, never by an algorithm.
+   ===================================================================== */
+const Presets = (() => {
+  'use strict';
+  const DF = `Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+  const SYS = `Verdana, 'DejaVu Sans', 'Bitstream Vera Sans', Geneva, sans-serif`;
+  const T = (x, y, size, weight, fill, text, extra = '') =>
+    `<text x="${x}" y="${y}" font-family="${DF}" font-size="${size}" font-weight="${weight}" fill="${fill}"${extra}>${text}</text>`;
+  const MID = ' text-anchor="middle"';
+  const END = ' text-anchor="end"';
+
+  /* ------------------------------------------------------------------
+     1. Pricing page — 1200 × 880
+     ------------------------------------------------------------------ */
+  const PLANS = [
+    { name: 'Starter', desc: 'For individuals trying things out', price: '$0', pw: 52,
+      feats: ['1 workspace', 'Up to 3 members', '2 GB file storage', 'Community support'], cta: 'Get started' },
+    { name: 'Team', desc: 'For teams shipping every week', price: '$24', pw: 78, badge: 'Most popular', primary: true,
+      feats: ['Unlimited workspaces', 'Up to 50 members', '200 GB file storage', 'Single sign-on (SSO)', 'Priority email support'], cta: 'Start 14-day trial' },
+    { name: 'Enterprise', desc: 'For organizations with compliance needs', price: '$79', pw: 78,
+      feats: ['Everything in Team', 'Unlimited members', 'Audit log &amp; retention', 'SCIM provisioning', 'Dedicated success manager'], cta: 'Talk to sales' },
+  ];
+
+  function pricingSVG() {
+    const o = [];
+    o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880" fill="none">`);
+    o.push(`<rect width="1200" height="880" fill="#EEF1F5"/>`);
+    o.push(`<g id="Nav"><rect width="1200" height="72" fill="#FFFFFF"/><rect y="72" width="1200" height="1" fill="#D8DEE6"/>`);
+    o.push(`<rect x="40" y="22" width="28" height="28" rx="7" fill="#1E293B"/><path d="M48 42L54 30L60 42Z" fill="#FFFFFF"/>`);
+    o.push(T(80, 42, 18, 700, '#0F172A', 'Northwind'));
+    [['Product', 470], ['Pricing', 552, 1], ['Docs', 630], ['Changelog', 694]].forEach(([s, x, on]) =>
+      o.push(T(x, 41, 15, on ? 600 : 400, on ? '#0F172A' : '#5B6577', s)));
+    o.push(T(958, 41, 15, 600, '#0F172A', 'Sign in'));
+    o.push(`<rect x="1036" y="16" width="124" height="40" rx="8" fill="#0F172A"/>`);
+    o.push(T(1098, 41, 15, 600, '#FFFFFF', 'Start free', MID), `</g>`);
+    o.push(`<g id="Hero">`);
+    o.push(T(600, 150, 40, 700, '#0F172A', 'Pricing that grows with your team', MID + ' letter-spacing="-0.4"'));
+    o.push(T(600, 186, 18, 400, '#5B6577', 'Start free. Upgrade when you need more seats, storage and control.', MID));
+    o.push(`<rect x="490" y="218" width="220" height="40" rx="20" fill="#DCE1E8"/>`);
+    o.push(`<rect x="494.5" y="222.5" width="105" height="31" rx="15.5" fill="#FFFFFF" stroke="#C9D0DA"/>`);
+    o.push(T(547, 243, 14, 600, '#0F172A', 'Monthly', MID), T(653, 243, 14, 400, '#5B6577', 'Yearly −20%', MID), `</g>`);
+    PLANS.forEach((p, k) => {
+      const x = 60 + k * 368;
+      o.push(`<g id="Card/${p.name}">`);
+      o.push(p.primary
+        ? `<rect x="${x + 1}" y="291" width="342" height="458" rx="15" fill="#FFFFFF" stroke="#4338CA" stroke-width="2"/>`
+        : `<rect x="${x + 0.5}" y="290.5" width="343" height="459" rx="15.5" fill="#FFFFFF" stroke="#D8DEE6"/>`);
+      o.push(T(x + 32, 342, 20, 700, '#0F172A', p.name));
+      if (p.badge) {
+        o.push(`<rect x="${x + 208}" y="322" width="104" height="24" rx="12" fill="#EEF0FF"/>`);
+        o.push(T(x + 260, 338, 12, 600, '#4338CA', p.badge, MID));
+      }
+      o.push(T(x + 32, 368, 14, 400, '#5B6577', p.desc));
+      o.push(T(x + 32, 428, 44, 700, '#0F172A', p.price, ' letter-spacing="-1"'));
+      o.push(T(x + 32 + p.pw + 8, 428, 15, 400, '#5B6577', '/ month'));
+      o.push(`<rect x="${x + 32}" y="452" width="280" height="1" fill="#E2E7EE"/>`);
+      p.feats.forEach((f, i) => {
+        const yb = 494 + i * 36;
+        o.push(`<circle cx="${x + 41}" cy="${yb - 5}" r="9" fill="#DCF5E4"/>`);
+        o.push(`<path d="M${x + 37} ${yb - 5}l3 3l5 -6" stroke="#15803D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`);
+        o.push(T(x + 60, yb, 15, 400, '#334155', f));
+      });
+      o.push(p.primary
+        ? `<rect x="${x + 32}" y="676" width="280" height="44" rx="10" fill="#4338CA"/>`
+        : `<rect x="${x + 32.5}" y="676.5" width="279" height="43" rx="9.5" fill="#FFFFFF" stroke="#C5CDD8"/>`);
+      o.push(T(x + 172, 703, 15, 600, p.primary ? '#FFFFFF' : '#0F172A', p.cta, MID), `</g>`);
+    });
+    o.push(`<g id="Footer"><rect x="60" y="800" width="1080" height="1" fill="#D8DEE6"/>`);
+    o.push(T(60, 840, 14, 400, '#7A8496', '© 2026 Northwind Labs, Inc.'));
+    o.push(T(968, 840, 14, 400, '#7A8496', 'Privacy'), T(1039, 840, 14, 400, '#7A8496', 'Terms'), T(1140, 840, 14, 400, '#7A8496', 'Status', END), `</g>`);
+    o.push(`</svg>`);
+    return o.join('\n');
+  }
+
+  function pricingHTML(v = {}) {
+    const navH = v.navH || 73;
+    const cards = PLANS.map((p, k) => {
+      const feats = p.feats.filter(f => !(v.dropScim && f === 'SCIM provisioning'));
+      const ctaBug = v.teamCtaGray && p.primary;
+      const cardBug = v.teamDrop && p.primary;
+      return `
+    <section class="card${p.primary ? ' primary' : ''}"${cardBug ? ' data-bug="Team card dropped 18px"' : ''}>
+      <div class="head"><h3 class="name">${p.name}</h3>${p.badge ? `<span class="badge">${p.badge}</span>` : ''}</div>
+      <p class="desc">${p.desc}</p>
+      <div class="price"><b>${p.price}</b><span>/ month</span></div>
+      <hr>
+      <ul>${feats.map(f => `
+        <li><span class="ck"><i></i></span>${f}</li>`).join('')}
+      </ul>
+      <a class="btn${p.primary ? ' primary' : ''}"${ctaBug ? ' data-bug="CTA uses neutral gray instead of brand indigo" style="background:#64748B;border-color:#64748B"' : ''}>${p.cta}</a>
+    </section>`;
+    }).join('');
+    const toggle = v.toggleYearly
+      ? `<div class="toggle" data-bug="Billing toggle shows Yearly selected"><span>Monthly</span><span class="knob">Yearly −20%</span></div>`
+      : `<div class="toggle"><span class="knob">Monthly</span><span>Yearly −20%</span></div>`;
+    return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pricing — Northwind</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #EEF1F5; }
+  body { width: 1200px; height: 880px; position: relative; overflow: hidden;
+         font-family: ${SYS}; color: #0F172A; }
+  a { color: inherit; text-decoration: none; }
+  .nav { height: ${navH}px; background: #fff; border-bottom: 1px solid #D8DEE6;
+         display: flex; align-items: center; padding: 0 40px; }
+  .brand { width: 430px; display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; }
+  .mark { width: 28px; height: 28px; border-radius: 7px; background: #1E293B;
+          display: flex; align-items: center; justify-content: center; }
+  .mark b { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent;
+            border-bottom: 12px solid #fff; }
+  .links { display: flex; gap: 28px; font-size: 15px; color: #5B6577; }
+  .links .on { color: #0F172A; font-weight: 600; }
+  .right { margin-left: auto; display: flex; align-items: center; gap: 28px; font-size: 15px; font-weight: 600; }
+  .cta { width: 124px; height: 40px; border-radius: 8px; background: #0F172A; color: #fff;
+         display: flex; align-items: center; justify-content: center; }
+  .hero { text-align: center; padding-top: 40px; }
+  h1 { font-size: 40px; line-height: 48px; font-weight: 700; letter-spacing: -0.01em; }
+  .sub { margin-top: 6px; font-size: 18px; line-height: 26px; color: #5B6577; }
+  .toggle { margin: 25px auto 0; width: 220px; height: 40px; border-radius: 20px; background: #DCE1E8;
+            padding: 4px; display: flex; font-size: 14px; }
+  .toggle span { flex: 1; display: flex; align-items: center; justify-content: center; color: #5B6577; }
+  .toggle .knob { flex: 0 0 106px; background: #fff; border: 1px solid #C9D0DA; border-radius: 16px;
+                  color: #0F172A; font-weight: 600; }
+  .cards { display: flex; gap: 24px; padding: 0 60px; margin-top: 32px; align-items: flex-start; }
+  .card { width: 344px; height: 460px; background: #fff; border: 1px solid #D8DEE6; border-radius: 16px;
+          padding: 31px 31px 29px; display: flex; flex-direction: column; }
+  .card.primary { border: 2px solid #4338CA; padding: 30px 30px 28px;${v.teamDrop ? ' margin-top: 18px;' : ''} }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .name { font-size: 20px; line-height: 28px; font-weight: 700; }
+  .badge { height: 24px; padding: 0 12px; border-radius: 12px; background: #EEF0FF; color: #4338CA;
+           font-size: 12px; font-weight: 600; display: flex; align-items: center; }
+  .desc { margin-top: 4px; font-size: 14px; line-height: 20px; color: #5B6577; }
+  .price { margin-top: 14px; display: flex; align-items: baseline; gap: 8px; }
+  .price b { font-size: 44px; line-height: 52px; font-weight: 700; letter-spacing: -1px; }
+  .price span { font-size: 15px; color: #5B6577; }
+  hr { margin-top: 12px; border: 0; height: 1px; background: #E2E7EE; }
+  ul { list-style: none; margin-top: 25px; display: flex; flex-direction: column; gap: 14px; }
+  li { display: flex; align-items: center; gap: 10px; font-size: 15px; line-height: 22px; color: #334155; }
+  .ck { width: 18px; height: 18px; border-radius: 50%; background: #DCF5E4; flex: none;
+        display: flex; align-items: center; justify-content: center; }
+  .ck i { width: 9px; height: 5px; border-left: 2px solid #15803D; border-bottom: 2px solid #15803D;
+          transform: translateY(-1px) rotate(-45deg); }
+  .btn { margin-top: auto; height: 44px; border-radius: 10px; border: 1px solid #C5CDD8; background: #fff;
+         font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  .btn.primary { background: #4338CA; border-color: #4338CA; color: #fff; }
+  .foot { position: absolute; left: 60px; right: 60px; top: 800px; border-top: 1px solid #D8DEE6;
+          padding-top: 25px; display: flex; font-size: 14px; line-height: 20px; color: #7A8496; }
+  .foot nav { margin-left: auto; display: flex; gap: 24px; }
+</style>
+</head>
+<body>
+  <header class="nav"${v.navH ? ' data-bug="Nav bar 24px taller than spec"' : ''}>
+    <div class="brand"><span class="mark"><b></b></span>Northwind</div>
+    <nav class="links">
+      <a>Product</a><a class="on">Pricing</a><a${v.docsShift ? ` data-bug="Docs link pushed ${v.docsShift}px right" style="margin-left:${v.docsShift}px"` : ''}>Docs</a><a>Changelog</a>
+    </nav>
+    <div class="right"><a>Sign in</a><a class="cta">Start free</a></div>
+  </header>
+  <main>
+    <div class="hero">
+      <h1>Pricing that grows with your team</h1>
+      <p class="sub">Start free. Upgrade when you need more seats, storage and control.</p>
+      ${toggle}
+    </div>
+    <div class="cards">${cards}
+    </div>
+  </main>
+  <footer class="foot">
+    <span>© 2026 Northwind Labs, Inc.</span>
+    <nav><a>Privacy</a><a>Terms</a><a>Status</a></nav>
+  </footer>
+</body>
+</html>`;
+  }
+
+  /* ------------------------------------------------------------------
+     2. Account settings — 1100 × 760
+     ------------------------------------------------------------------ */
+  const MENU = ['Overview', 'Projects', 'Deployments', 'Billing', 'Settings', 'Support'];
+  const FIELDS = [['Full name', 'Avery Chen'], ['Email', 'avery@acme.dev'], ['Role', 'Engineering manager', 1], ['Time zone', 'Europe/Lisbon (GMT+1)']];
+  const SWITCHES = [['Product updates', 'A monthly summary of new features', 1], ['Two-factor authentication', 'Require a code from your authenticator app', 0]];
+
+  function settingsSVG() {
+    const o = [];
+    o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="760" viewBox="0 0 1100 760" fill="none">`);
+    o.push(`<rect width="1100" height="760" fill="#F3F5F8"/>`);
+    o.push(`<g id="Sidebar"><rect width="232" height="760" fill="#111827"/>`);
+    o.push(`<rect x="24" y="24" width="24" height="24" rx="6" fill="#6366F1"/>`, T(58, 42, 16, 700, '#F9FAFB', 'Acme Cloud'));
+    MENU.forEach((m, i) => {
+      const y = 84 + i * 40, on = m === 'Settings';
+      if (on) o.push(`<rect x="12" y="${y}" width="208" height="36" rx="8" fill="#1F2937"/>`);
+      o.push(`<rect x="28" y="${y + 10}" width="16" height="16" rx="4" fill="${on ? '#A5B4FC' : '#374151'}"/>`);
+      o.push(T(56, y + 23, 14, on ? 600 : 400, on ? '#F9FAFB' : '#9CA3AF', m));
+    });
+    o.push(`<circle cx="36" cy="720" r="14" fill="#F59E0B"/>`, T(58, 724, 14, 400, '#E5E7EB', 'Avery Chen'), `</g>`);
+    o.push(`<g id="Header">`, T(272, 70, 26, 700, '#0F172A', 'Account settings'));
+    o.push(T(272, 96, 14, 400, '#5E6878', 'Manage your profile, security and notifications.'), `</g>`);
+    o.push(`<g id="Panel"><rect x="272.5" y="124.5" width="787" height="535" rx="11.5" fill="#FFFFFF" stroke="#DCE1E7"/>`);
+    o.push(T(304, 164, 16, 600, '#0F172A', 'Profile'));
+    FIELDS.forEach(([l, val, sel], i) => {
+      const y = 184 + i * 56;
+      o.push(T(304, y + 25, 14, 500, '#334155', l));
+      o.push(`<rect x="520.5" y="${y + 0.5}" width="507" height="39" rx="7.5" fill="#FFFFFF" stroke="#CBD3DD"/>`);
+      o.push(T(536, y + 25, 14, 400, '#0F172A', val));
+      if (sel) o.push(`<path d="M1002 ${y + 17}l5 5l5 -5" stroke="#64748B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`);
+    });
+    o.push(`<rect x="304" y="416" width="724" height="1" fill="#E5E8EC"/>`);
+    o.push(T(304, 452, 16, 600, '#0F172A', 'Notifications'));
+    SWITCHES.forEach(([l, d, on], i) => {
+      const y = 472 + i * 56;
+      o.push(T(304, y + 14, 14, 500, '#0F172A', l), T(304, y + 34, 13, 400, '#6B7486', d));
+      o.push(`<rect x="984" y="${y + 2}" width="44" height="24" rx="12" fill="${on ? '#2563EB' : '#CBD3DD'}"/>`);
+      o.push(`<circle cx="${on ? 1016 : 996}" cy="${y + 14}" r="9" fill="#FFFFFF"/>`);
+    });
+    o.push(`<rect x="812.5" y="588.5" width="91" height="39" rx="7.5" fill="#FFFFFF" stroke="#CBD3DD"/>`, T(858, 613, 14, 600, '#0F172A', 'Cancel', MID));
+    o.push(`<rect x="916" y="588" width="112" height="40" rx="8" fill="#2563EB"/>`, T(972, 613, 14, 600, '#FFFFFF', 'Save changes', MID), `</g>`);
+    o.push(T(272, 690, 13, 400, '#7A8496', 'Last saved 2 minutes ago'));
+    o.push(`</svg>`);
+    return o.join('\n');
+  }
+
+  function settingsHTML(v = {}) {
+    const rows = FIELDS.map(([l, val, sel], i) => `
+        <div class="row"><label>${l}</label><div class="fieldcol">
+          <div class="input${sel ? ' select' : ''}"${i === 1 && v.emailNarrow ? ' data-bug="Email field 120px too narrow" style="width:388px"' : ''}>${val}${sel ? '<i class="chev"></i>' : ''}</div>${i === 0 && v.extraHelper ? `
+          <p class="help" data-bug="Helper text not in the design">Shown on your profile and in emails.</p>` : ''}
+        </div></div>`).join('');
+    const sw = SWITCHES.map(([l, d, on], i) => `
+        <div class="srow"><div><b>${l}</b><span>${d}</span></div>${i === 1 && v.dropSwitch ? '' : `<i class="switch${on ? ' on' : ''}"></i>`}</div>`).join('');
+    return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Account settings — Acme Cloud</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #F3F5F8; }
+  body { width: 1100px; height: 760px; position: relative; overflow: hidden; display: flex;
+         font-family: ${SYS}; color: #0F172A; }
+  .side { width: 232px; height: 760px; background: #111827; padding: 24px 12px; position: relative; flex: none; }
+  .brand { height: 24px; padding-left: 12px; display: flex; align-items: center; gap: 10px;
+           color: #F9FAFB; font-size: 16px; font-weight: 700; }
+  .brand i { width: 24px; height: 24px; border-radius: 6px; background: #6366F1; }
+  .menu { margin-top: 36px; display: flex; flex-direction: column; gap: 4px; }
+  .item { height: 36px; border-radius: 8px; padding-left: 16px; display: flex; align-items: center; gap: 12px;
+          font-size: 14px; color: #9CA3AF; }
+  .item i { width: 16px; height: 16px; border-radius: 4px; background: #374151; }
+  .item.on { background: #1F2937; color: #F9FAFB; font-weight: 600; }
+  .item.on i { background: #A5B4FC; }
+  .me { position: absolute; left: 22px; top: 706px; display: flex; align-items: center; gap: 8px;
+        color: #E5E7EB; font-size: 14px; }
+  .me i { width: 28px; height: 28px; border-radius: 50%; background: #F59E0B; }
+  .main { padding: 45px 40px 0; width: 868px; }
+  h1 { font-size: 26px; line-height: 34px; font-weight: 700; }
+  .sub { margin-top: 3px; font-size: 14px; line-height: 20px; color: #5E6878; }
+  .panel { margin-top: 22px; width: 788px; background: #fff; border: 1px solid #DCE1E7; border-radius: 12px;
+           padding: 22px 31px 31px; }
+  h2 { font-size: 16px; line-height: 24px; font-weight: 600; }
+  .form { margin-top: 13px; display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; align-items: flex-start; }
+  .row label { width: 216px; height: 40px; display: flex; align-items: center; font-size: 14px; font-weight: 500; color: #334155; }
+  .input { width: 508px; height: 40px; border: 1px solid #CBD3DD; border-radius: 8px; padding: 0 15px;
+           display: flex; align-items: center; font-size: 14px; position: relative; }
+  .chev { position: absolute; right: 16px; top: 14px; width: 8px; height: 8px; border-right: 1.6px solid #64748B;
+          border-bottom: 1.6px solid #64748B; transform: rotate(45deg); }
+  .help { margin-top: 6px; font-size: 12px; line-height: 16px; color: #6B7486; }
+  hr { margin-top: 24px; border: 0; height: 1px; background: #E5E8EC; }
+  h2.n { margin-top: 18px; }
+  .switches { margin-top: 13px; display: flex; flex-direction: column; gap: 16px; }
+  .srow { display: flex; justify-content: space-between; align-items: flex-start; }
+  .srow b { display: block; font-size: 14px; line-height: 20px; font-weight: 500; }
+  .srow span { display: block; font-size: 13px; line-height: 20px; color: #6B7486; }
+  .switch { margin-top: 2px; width: 44px; height: 24px; border-radius: 12px; background: #CBD3DD; position: relative; flex: none; }
+  .switch:after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+  .switch.on { background: #2563EB; }
+  .switch.on:after { left: 23px; }
+  .actions { margin-top: 20px; display: flex; justify-content: ${v.buttonsLeft ? 'flex-start' : 'flex-end'}; gap: 12px; }
+  .btn { height: 40px; border-radius: 8px; padding: 0 17px; font-size: 14px; font-weight: 600; white-space: nowrap;
+         display: flex; align-items: center; justify-content: center; }
+  .btn.ghost { padding: 0 20px; border: 1px solid #CBD3DD; background: #fff; }
+  .btn.solid { padding: 0 10px; background: #2563EB; color: #fff; }
+  .saved { margin-top: 17px; font-size: 13px; line-height: 18px; color: #7A8496; }
+</style>
+</head>
+<body>
+  <aside class="side">
+    <div class="brand"><i></i>Acme Cloud</div>
+    <nav class="menu">${MENU.map(m => `
+      <a class="item${m === 'Settings' ? ' on' : ''}"><i></i>${m}</a>`).join('')}
+    </nav>
+    <div class="me"><i></i>Avery Chen</div>
+  </aside>
+  <main class="main">
+    <h1>Account settings</h1>
+    <p class="sub">Manage your profile, security and notifications.</p>
+    <section class="panel">
+      <h2>Profile</h2>
+      <div class="form">${rows}
+      </div>
+      <hr>
+      <h2 class="n">Notifications</h2>
+      <div class="switches">${sw}
+      </div>
+      <div class="actions"${v.buttonsLeft ? ' data-bug="Actions left-aligned instead of right"' : ''}><a class="btn ghost">Cancel</a><a class="btn solid">Save changes</a></div>
+    </section>
+    <p class="saved">Last saved 2 minutes ago</p>
+  </main>
+</body>
+</html>`;
+  }
+
+  /* ------------------------------------------------------------------
+     3. Mobile reading app — 390 × 844
+     ------------------------------------------------------------------ */
+  const ITEMS = [
+    ['Tide tables, decoded', '4 min · Data', '#FDE68A'],
+    ["A lighthouse keeper's log", '9 min · History', '#BFDBFE'],
+    ['Night ferry to Cacilhas', '3 min · Travel', '#FBCFE8'],
+  ];
+  const TABS = ['Home', 'Search', 'Saved', 'Profile'];
+  const EXCERPT = ['We spent a week walking the docks at dawn,', 'sketching cranes, cats and the fishermen', 'who still mend their nets by hand.'];
+
+  function mobileSVG() {
+    const o = [];
+    o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" fill="none">`);
+    o.push(`<defs><linearGradient id="hero" x1="32" y1="130" x2="358" y2="298" gradientUnits="userSpaceOnUse"><stop stop-color="#A5C8FF"/><stop offset="1" stop-color="#D2C2FF"/></linearGradient></defs>`);
+    o.push(`<rect width="390" height="844" fill="#FFFFFF"/>`);
+    o.push(`<g id="AppBar">`, T(20, 40, 22, 700, '#111827', 'Field notes'));
+    o.push(`<circle cx="350" cy="32" r="18" fill="#FDE68A"/>`, T(350, 37, 13, 700, '#92400E', 'MK', MID), `</g>`);
+    o.push(`<g id="Tabs"><rect x="20" y="64" width="350" height="38" rx="10" fill="#F1F3F6"/>`);
+    o.push(`<rect x="24.5" y="68.5" width="113" height="29" rx="7.5" fill="#FFFFFF" stroke="#E2E5EA"/>`);
+    o.push(T(81, 88, 14, 600, '#111827', 'Latest', MID), T(195, 88, 14, 400, '#6B7280', 'Following', MID), T(309, 88, 14, 400, '#6B7280', 'Saved', MID), `</g>`);
+    o.push(`<g id="Story"><rect x="20.5" y="118.5" width="349" height="371" rx="15.5" fill="#FFFFFF" stroke="#E5E7EB"/>`);
+    o.push(`<rect x="32" y="130" width="326" height="168" rx="12" fill="url(#hero)"/>`);
+    o.push(T(32, 326, 19, 700, '#111827', 'Mapping the quiet corners'), T(32, 350, 19, 700, '#111827', 'of the old harbour'));
+    o.push(`<circle cx="42" cy="375" r="10" fill="#A7F3D0"/>`, T(60, 380, 13, 400, '#6B7280', 'Lina Ortiz · 6 min read'));
+    EXCERPT.forEach((l, i) => o.push(T(32, 414 + i * 22, 15, 400, '#374151', l)));
+    o.push(`</g>`);
+    o.push(T(20, 530, 15, 700, '#111827', 'More this week'));
+    ITEMS.forEach(([t, m, c], i) => {
+      const y = 548 + i * 72;
+      o.push(`<rect x="20" y="${y}" width="56" height="56" rx="12" fill="${c}"/>`);
+      o.push(T(88, y + 22, 15, 600, '#111827', t.replace("'", '&#8217;')), T(88, y + 42, 13, 400, '#6B7280', m));
+    });
+    o.push(`<g id="TabBar"><rect y="776" width="390" height="1" fill="#E5E7EB"/>`);
+    TABS.forEach((t, i) => {
+      const cx = 48.75 + i * 97.5, on = i === 0;
+      o.push(`<rect x="${cx - 11}" y="788" width="22" height="22" rx="6" fill="${on ? '#111827' : '#D1D5DB'}"/>`);
+      o.push(T(cx, 826, 11, on ? 600 : 400, on ? '#111827' : '#9CA3AF', t, MID));
+    });
+    o.push(`</g></svg>`);
+    return o.join('\n');
+  }
+
+  function mobileHTML(v = {}) {
+    const order = v.swapRows ? [0, 2, 1] : [0, 1, 2];
+    const items = order.map((k, pos) => {
+      const [t, m, c] = ITEMS[k];
+      const bug = v.swapRows && pos > 0 ? ` data-bug="Row ${pos + 1} shows item ${k + 1} (order swapped)"` : '';
+      return `
+      <li${bug}><i style="background:${c}"></i><div><b>${t.replace("'", '&#8217;')}</b><span>${m}</span></div></li>`;
+    }).join('');
+    return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Field notes</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #fff; }
+  body { width: 390px; height: 844px; position: relative; overflow: hidden; font-family: ${SYS}; color: #111827; }
+  .bar { height: 64px; padding: 0 22px 0 20px; display: flex; align-items: center; justify-content: space-between; }
+  .bar h1 { font-size: 22px; line-height: 28px; font-weight: 700; }
+  .avatar { width: 36px; height: 36px; border-radius: ${v.squareAvatar ? '6px' : '50%'}; background: #FDE68A; color: #92400E;
+            font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .seg { margin: 0 20px; height: 38px; border-radius: 10px; background: #F1F3F6; padding: 4px; display: flex; }
+  .seg a { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #6B7280; }
+  .seg a.on { background: #fff; border: 1px solid #E2E5EA; border-radius: 8px; color: #111827; font-weight: 600; }
+  .story { margin: 16px 20px 0; border: 1px solid #E5E7EB; border-radius: 16px; padding: 11px 11px 25px; }
+  .img { height: ${v.imgH || 168}px; border-radius: 12px; background: linear-gradient(135deg, #A5C8FF, #D2C2FF); }
+  .story h2 { margin-top: 10px; font-size: 19px; line-height: 24px; font-weight: 700; }
+  .meta { margin-top: 9px; height: 20px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6B7280; }
+  .meta i { width: 20px; height: 20px; border-radius: 50%; background: #A7F3D0; }
+  .story p { margin-top: 13px; font-size: 15px; line-height: 22px; color: #374151;${v.narrowExcerpt ? ' max-width: 250px;' : ''} }
+  h3 { margin: 25px 20px 0; font-size: 15px; line-height: 20px; font-weight: 700; }
+  ul { list-style: none; margin: 13px 20px 0; display: flex; flex-direction: column; gap: 16px; }
+  li { height: 56px; display: flex; gap: 12px; }
+  li i { width: 56px; height: 56px; border-radius: 12px; flex: none; }
+  li div { padding-top: 7px; }
+  li b { display: block; font-size: 15px; line-height: 20px; font-weight: 600; }
+  li span { display: block; margin-top: 2px; font-size: 13px; line-height: 18px; color: #6B7280; }
+  .tabs { position: absolute; left: 0; right: 0; top: 776px; border-top: 1px solid #E5E7EB; padding-top: 11px; display: flex; }
+  .tabs a { flex: 1; display: flex; flex-direction: column; align-items: center; font-size: 11px; line-height: 14px; color: #9CA3AF; }
+  .tabs a i { width: 22px; height: 22px; border-radius: 6px; background: #D1D5DB; margin-bottom: 6px; }
+  .tabs a.on { color: #111827; font-weight: 600; }
+  .tabs a.on i { background: #111827; }
+</style>
+</head>
+<body>
+  <header class="bar"><h1>Field notes</h1><span class="avatar"${v.squareAvatar ? ' data-bug="Avatar is square, spec is a circle"' : ''}>MK</span></header>
+  <nav class="seg"><a class="on">Latest</a><a>Following</a><a>Saved</a></nav>
+  <article class="story">
+    <div class="img"${v.imgH ? ` data-bug="Cover image ${v.imgH}px tall, spec is 168px"` : ''}></div>
+    <h2>Mapping the quiet corners<br>of the old harbour</h2>
+    <div class="meta"><i></i>Lina Ortiz · 6 min read</div>
+    <p>${EXCERPT.join(' ')}</p>
+  </article>
+  <h3>More this week</h3>
+  <ul>${items}
+  </ul>
+  <nav class="tabs">${TABS.map((t, i) => `
+    <a class="${i === 0 ? 'on' : ''}"><i${i === 1 && v.shiftSearch ? ` data-bug="Search icon ${v.shiftSearch}px off-center" style="transform:translateX(${v.shiftSearch}px)"` : ''}></i>${t}</a>`).join('')}
+  </nav>
+</body>
+</html>`;
+  }
+
+  /* ------------------------------------------------------------------ */
+  const designs = [
+    { id: 'pricing', name: 'Pricing page', w: 1200, h: 880, kind: 'svg', src: pricingSVG() },
+    { id: 'settings', name: 'Account settings', w: 1100, h: 760, kind: 'svg', src: settingsSVG() },
+    { id: 'mobile', name: 'Mobile reading app', w: 390, h: 844, kind: 'svg', src: mobileSVG() },
+  ];
+  const impls = [
+    { id: 'pricing-a', design: 'pricing', name: 'Pricing · faithful, fallback font', kind: 'html', src: pricingHTML(),
+      note: 'Built from the spec with flexbox. The web font failed, so text renders in Verdana: wider glyphs, one description wraps. No layout bugs.' },
+    { id: 'pricing-b', design: 'pricing', name: 'Pricing · taller nav', kind: 'html', src: pricingHTML({ navH: 97 }),
+      note: 'One bug: the nav bar is 24px taller, which pushes the whole page down.' },
+    { id: 'pricing-c', design: 'pricing', name: 'Pricing · three bugs', kind: 'html', src: pricingHTML({ teamCtaGray: true, dropScim: true, docsShift: 30 }),
+      note: 'Team CTA is gray, Enterprise lost a feature row, Docs link sits 30px right.',
+      missing: [{ label: 'Enterprise card lost “SCIM provisioning”', box: { x0: 826, y0: 584, x1: 1000, y1: 608 } }] },
+    { id: 'pricing-d', design: 'pricing', name: 'Pricing · card drop + toggle', kind: 'html', src: pricingHTML({ teamDrop: true, toggleYearly: true }),
+      note: 'Team card renders 18px low; billing toggle shows the wrong selection.' },
+    { id: 'settings-a', design: 'settings', name: 'Settings · faithful, fallback font', kind: 'html', src: settingsHTML(),
+      note: 'Built from the spec in the fallback font. Buttons hug their labels, so their widths differ. No layout bugs.' },
+    { id: 'settings-b', design: 'settings', name: 'Settings · four bugs', kind: 'html', src: settingsHTML({ emailNarrow: true, extraHelper: true, dropSwitch: true, buttonsLeft: true }),
+      note: 'Narrow email field, an extra helper line that pushes rows down, a missing switch, left-aligned actions.',
+      missing: [{ label: 'Two-factor switch missing', box: { x0: 984, y0: 530, x1: 1028, y1: 554 } }] },
+    { id: 'mobile-a', design: 'mobile', name: 'Mobile · paragraph reflow', kind: 'html', src: mobileHTML({ narrowExcerpt: true }),
+      note: 'No bugs, but the excerpt wraps to four lines, so everything below the card shifts 22px.' },
+    { id: 'mobile-b', design: 'mobile', name: 'Mobile · four bugs', kind: 'html', src: mobileHTML({ imgH: 140, swapRows: true, squareAvatar: true, shiftSearch: 16 }),
+      note: 'Short cover image, two list rows swapped, square avatar, Search icon 16px off-center.' },
+  ];
+  const gallery = [
+    { id: 'clean', title: 'Fonts differ, nothing broken', design: 'pricing', impl: 'pricing-a', algo: 'viterbi-flow', tag: 'clean' },
+    { id: 'clean-pixel', title: 'Same pair through a pixel diff', design: 'pricing', impl: 'pricing-a', algo: 'pixel', tag: 'baseline' },
+    { id: 'cascade-flat', title: 'Taller nav, flat boxes', design: 'pricing', impl: 'pricing-b', algo: 'flat', tag: 'cascade' },
+    { id: 'cascade-tree', title: 'Taller nav, parent-relative tree', design: 'pricing', impl: 'pricing-b', algo: 'tree', tag: 'cascade' },
+    { id: 'cascade-flow', title: 'Taller nav, flow attribution', design: 'pricing', impl: 'pricing-b', algo: 'viterbi-flow', tag: 'cascade' },
+    { id: 'pricing-bugs', title: 'Three planted bugs', design: 'pricing', impl: 'pricing-c', algo: 'viterbi-flow', tag: 'bugs' },
+    { id: 'pricing-drop', title: 'Card drops, toggle flips', design: 'pricing', impl: 'pricing-d', algo: 'viterbi-flow', tag: 'bugs' },
+    { id: 'settings-clean', title: 'Settings, faithful', design: 'settings', impl: 'settings-a', algo: 'viterbi-flow', tag: 'clean' },
+    { id: 'settings-bugs', title: 'Settings, four bugs', design: 'settings', impl: 'settings-b', algo: 'viterbi-flow', tag: 'bugs' },
+    { id: 'reflow-tree', title: 'Paragraph reflow, tree', design: 'mobile', impl: 'mobile-a', algo: 'tree', tag: 'cascade' },
+    { id: 'reflow-flow', title: 'Paragraph reflow, flow', design: 'mobile', impl: 'mobile-a', algo: 'viterbi-flow', tag: 'cascade' },
+    { id: 'mobile-bugs', title: 'Mobile, four bugs', design: 'mobile', impl: 'mobile-b', algo: 'viterbi-flow', tag: 'bugs' },
+    { id: 'mismatch', title: 'Wrong pairing', design: 'pricing', impl: 'settings-a', algo: 'viterbi-flow', tag: 'mix' },
+  ];
+  return { designs, impls, gallery };
+})();
+if (typeof window !== 'undefined') window.Presets = Presets;
+
+</script>
+<script>
+(() => {
+  'use strict';
+  const E = window.Engine, PR = window.Presets;
+  const { W_, H_, CX, CY, AREA } = E.geom;
+  const $ = (s, r = document) => r.querySelector(s);
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+  function el(tag, attrs, ...kids) {
+    const n = document.createElement(tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
+      else if (k === 'style' && typeof v === 'object') Object.assign(n.style, v);
+      else n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of kids.flat(3)) if (c != null && c !== false) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+    return n;
+  }
+  function sv(tag, attrs, ...kids) {
+    const n = document.createElementNS(SVGNS, tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) if (v != null) n.setAttribute(k, v);
+    for (const c of kids.flat(3)) if (c) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+    return n;
+  }
+  const fmt = (v, d = 0) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(d);
+  const round = v => Math.round(v);
+  const boxStr = b => b ? `${round(b.x0)},${round(b.y0)} ${round(W_(b))}×${round(H_(b))}` : '—';
+  const idle = () => new Promise(r => setTimeout(r, 0));
+
+  /* Overlays sit on light UI renders in both themes, so their colors are fixed. */
+  const OV = { major: '#D03B3B', minor: '#E39400', ok: '#0E9F0E', design: '#0087B8', build: '#C2187A', ink: '#0F1318', sel: '#0F1318' };
+  const KIND_COLORS = { container: '#2a78d6', text: '#eb6834', shape: '#1baf7a', icon: '#eda100', image: '#e87ba4', rule: '#008300' };
+
+  /* ---------------- state ---------------- */
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  };
+  const S = {
+    designs: PR.designs.map(d => ({ id: d.id, name: d.name, kind: 'svg', src: d.src, w: d.w, h: d.h, builtin: true })),
+    impls: PR.impls.map(m => ({ ...m, builtin: true })),
+    designId: 'pricing', implId: 'pricing-c', algo: 'viterbi-flow', view: 'diff', presetId: 'pricing-bugs',
+    P: { ...E.DEFAULTS }, spot: true, showOk: false, sel: null, swipe: 50,
+    res: null, err: null, bench: null, drawer: null,
+  };
+  const saved = store.get('redline.custom.v1');
+  if (saved) {
+    for (const d of saved.designs || []) if (!S.designs.some(x => x.id === d.id)) S.designs.push(d);
+    for (const m of saved.impls || []) if (!S.impls.some(x => x.id === m.id)) S.impls.push(m);
+  }
+  function saveCustom() {
+    const keep = it => !it.builtin && (it.kind !== 'image' || it.src.length < 1500000);
+    store.set('redline.custom.v1', { designs: S.designs.filter(keep), impls: S.impls.filter(keep) });
+  }
+  const designOf = id => S.designs.find(d => d.id === id);
+  const implOf = id => S.impls.find(m => m.id === id);
+  const algoOf = id => E.ALGOS.find(a => a.id === id);
+
+  /* ---------------- caches ---------------- */
+  const C = { img: new Map(), seg: new Map(), gt: new Map(), canv: new WeakMap(), plates: new Map() };
+  const toSrc = it => (it.kind === 'image' ? { type: 'image', url: it.src } : { type: it.kind, text: it.src });
+  const segKey = P => `${P.edgeT}|${P.kH}|${P.kV}`;
+  async function designSize(d) {
+    if (!d.w || !d.h) { const s = await E.nativeSize(toSrc(d)); d.w = s.w; d.h = s.h; }
+    return { w: d.w, h: d.h };
+  }
+  function raster(it, W, H) {
+    const k = `${it.id}@${W}x${H}`;
+    if (!C.img.has(k)) {
+      const p = E.rasterize(toSrc(it), W, H);
+      C.img.set(k, p);
+      p.catch(() => C.img.delete(k));
+    }
+    return C.img.get(k);
+  }
+  async function prepared(it, W, H) {
+    const img = await raster(it, W, H);
+    const k = `${it.id}@${W}x${H}|${segKey(S.P)}`;
+    if (!C.seg.has(k)) C.seg.set(k, E.segment(img, S.P));
+    return { img, seg: C.seg.get(k) };
+  }
+  const lineage = d => d.origin || d.id;
+  function groundTruth(m, d) {
+    if (m.kind !== 'html' || m.design !== lineage(d)) return Promise.resolve(null);
+    const k = `${m.id}@${d.w}x${d.h}`;
+    if (!C.gt.has(k)) {
+      C.gt.set(k, E.groundTruth(m.src, d.w, d.h).then(g => {
+        const all = g.concat((m.missing || []).map(x => ({ label: x.label, box: x.box, space: 'design' })));
+        return all.length ? all : null;
+      }).catch(() => null));
+    }
+    return C.gt.get(k);
+  }
+  function canvasOf(img) {
+    if (C.canv.has(img)) return C.canv.get(img);
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    c.getContext('2d').putImageData(img, 0, 0);
+    C.canv.set(img, c);
+    return c;
+  }
+  /* Registration plates: design ink prints cyan, build ink prints magenta, both = black. */
+  function plates(imgD, imgM, scale = 1) {
+    const W = Math.max(1, Math.round(imgD.width * scale)), H = Math.max(1, Math.round(imgD.height * scale));
+    const small = img => {
+      if (scale === 1) return img.data;
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const x = c.getContext('2d', { willReadFrequently: true });
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(canvasOf(img), 0, 0, W, H);
+      return x.getImageData(0, 0, W, H).data;
+    };
+    const a = small(imgD), b = small(imgM);
+    const out = new ImageData(W, H), o = out.data;
+    for (let i = 0; i < a.length; i += 4) {
+      const ia = Math.pow(1 - (0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2]) / 255, 0.75);
+      const ib = Math.pow(1 - (0.299 * b[i] + 0.587 * b[i + 1] + 0.114 * b[i + 2]) / 255, 0.75);
+      o[i] = 255 * (1 - ia); o[i + 1] = 255 * (1 - ib); o[i + 2] = 255 * (1 - Math.min(ia, ib)); o[i + 3] = 255;
+    }
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    c.getContext('2d').putImageData(out, 0, 0);
+    return c;
+  }
+
+  /* ---------------- compute ---------------- */
+  let token = 0;
+  async function compute(opts = {}) {
+    const my = ++token;
+    busy(true);
+    try {
+      const d = designOf(S.designId), m = implOf(S.implId);
+      const { w, h } = await designSize(d);
+      const [D, M] = await Promise.all([prepared(d, w, h), prepared(m, w, h)]);
+      const gt = await groundTruth(m, d);
+      if (my !== token) return;
+      await idle();
+      const r = E.run(S.algo, D.seg, M.seg, D.img, M.img, S.P);
+      const ev = gt ? E.evaluate(r.findings, gt) : null;
+      const flagged = r.findings.filter(f => f.level !== 'ok').sort((a, b) => b.sev - a.sev);
+      S.res = { d, m, D, M, r, gt, ev, W: w, H: h, flagged };
+      S.err = null;
+      if (!opts.keepSel || !r.findings.some(f => f.id === S.sel)) {
+        const moved = flagged.find(f => f.type === 'position');
+        S.sel = moved ? moved.id : flagged.length ? flagged[0].id : null;
+      }
+    } catch (e) {
+      if (my !== token) return;
+      S.err = (e && e.message) || String(e); S.res = null;
+    }
+    busy(false);
+    renderControls(); renderStage(); renderInspector(); renderGalleryActive(); renderBench();
+  }
+  function busy(on) { $('#busy').classList.toggle('on', on); $('#mat').classList.toggle('dim', on && !!S.res); }
+
+  /* ---------------- controls ---------------- */
+  function renderControls() {
+    const sd = $('#selDesign'), si = $('#selImpl');
+    sd.replaceChildren(...S.designs.map(d => el('option', { value: d.id, text: d.name + (d.builtin ? '' : ' · yours') })));
+    sd.value = S.designId;
+    const dl = lineage(designOf(S.designId));
+    const own = S.impls.filter(m => m.design === dl), other = S.impls.filter(m => m.design !== dl);
+    si.replaceChildren(
+      el('optgroup', { label: 'Built for this design' }, own.map(m => el('option', { value: m.id, text: m.name }))),
+      other.length ? el('optgroup', { label: 'Other builds (mix and match)' }, other.map(m => el('option', { value: m.id, text: m.name }))) : null);
+    si.value = S.implId;
+    const chips = $('#algoChips');
+    chips.replaceChildren(...E.ALGOS.map(a => el('button', {
+      class: 'chip', type: 'button', 'aria-pressed': String(a.id === S.algo), title: a.blurb,
+      onclick: () => { S.algo = a.id; S.presetId = null; compute({ keepSel: false }); },
+    }, a.name)));
+    for (const b of document.querySelectorAll('#views button')) b.setAttribute('aria-pressed', String(b.dataset.view === S.view));
+    $('#optSpot').checked = S.spot;
+    $('#optOk').checked = S.showOk;
+  }
+  $('#selDesign').addEventListener('change', e => {
+    S.designId = e.target.value; S.presetId = null;
+    const dl = lineage(designOf(S.designId));
+    const own = S.impls.find(m => m.design === dl);
+    if (own && implOf(S.implId).design !== dl) S.implId = own.id;
+    compute();
+  });
+  $('#selImpl').addEventListener('change', e => { S.implId = e.target.value; S.presetId = null; compute(); });
+  document.querySelectorAll('#views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderControls(); renderStage(); }));
+  $('#optSpot').addEventListener('change', e => { S.spot = e.target.checked; renderStage(); });
+  $('#optOk').addEventListener('change', e => { S.showOk = e.target.checked; renderStage(); });
+
+  /* ---------------- gallery ---------------- */
+  function renderGallery() {
+    const g = $('#gallery');
+    g.replaceChildren(...PR.gallery.map(p => {
+      const a = algoOf(p.algo), m = implOf(p.impl);
+      const btn = el('button', {
+        class: 'preset', type: 'button', 'data-id': p.id, title: m ? m.note : '',
+        onclick: () => loadPreset(p.id, true),
+      }, el('span', { class: 'th' }), el('span', { class: 't', text: p.title }),
+      el('span', { class: 's' }, el('span', { class: 'tag', text: a.short }), m && (m.missing || m.src.includes('data-bug')) && p.design === m.design ? el('span', { text: bugCount(m) }) : null));
+      return btn;
+    }));
+    renderGalleryActive();
+  }
+  function bugCount(m) {
+    const n = (m.src.match(/data-bug="/g) || []).length + (m.missing ? m.missing.length : 0);
+    return n ? `${n} planted bug${n > 1 ? 's' : ''}` : '';
+  }
+  function renderGalleryActive() {
+    for (const b of document.querySelectorAll('.preset')) {
+      const p = PR.gallery.find(x => x.id === b.dataset.id);
+      const on = p && p.design === S.designId && p.impl === S.implId && p.algo === S.algo;
+      b.setAttribute('aria-current', String(!!on));
+    }
+  }
+  async function drawThumbs() {
+    for (const p of PR.gallery) {
+      const btn = document.querySelector(`.preset[data-id="${p.id}"] .th`);
+      if (!btn || btn.firstChild) continue;
+      try {
+        const d = designOf(p.design), m = implOf(p.impl);
+        const [D, M] = await Promise.all([raster(d, d.w, d.h), raster(m, d.w, d.h)]);
+        const k = `${p.design}|${p.impl}`;
+        if (!C.plates.has(k)) C.plates.set(k, plates(D, M, Math.min(128 / d.w, 96 / d.h)));
+        btn.replaceChildren(C.plates.get(k).cloneNode ? cloneCanvas(C.plates.get(k)) : C.plates.get(k));
+      } catch (e) { /* thumbnail is optional */ }
+      await idle();
+    }
+  }
+  function cloneCanvas(src) { const c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); return c; }
+  function loadPreset(id, setHash) {
+    const p = PR.gallery.find(x => x.id === id);
+    if (!p) return;
+    Object.assign(S, { designId: p.design, implId: p.impl, algo: p.algo, presetId: p.id });
+    if (setHash) { try { history.replaceState(null, '', '#' + p.id); } catch (e) { /* ignore */ } }
+    compute();
+  }
+
+  /* ---------------- stage ---------------- */
+  function sizeStyle(W, H, n) {
+    const r = W / H;
+    return { width: `min(${W}px, 100%, calc(${n > 1 ? 66 : 72}vh * ${r.toFixed(4)}))` };
+  }
+  function frameEl(W, H, cap, plate, n = 1) {
+    const box = el('div', { class: 'canvasbox' });
+    const fr = el('div', { class: 'fr', style: sizeStyle(W, H, n) }, cap ? el('div', { class: 'cap' }, el('i', { style: { background: plate } }), cap) : null, box);
+    return { fr, box };
+  }
+  function baseCanvas(img, wash) {
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d');
+    x.drawImage(canvasOf(img), 0, 0);
+    if (wash) { x.fillStyle = `rgba(255,255,255,${wash})`; x.fillRect(0, 0, c.width, c.height); }
+    return c;
+  }
+  const visible = () => {
+    if (!S.res) return [];
+    return S.res.r.findings.filter(f => f.level !== 'ok' || (S.showOk && f.type === 'match'));
+  };
+  function colorOf(f) {
+    if (f.type === 'missing' || f.type === 'frame-missing') return OV.design;
+    if (f.type === 'extra' || f.type === 'frame-extra') return OV.build;
+    return f.level === 'major' ? OV.major : f.level === 'minor' ? OV.minor : OV.ok;
+  }
+  function shortTag(f) {
+    switch (f.type) {
+      case 'missing': return 'missing';
+      case 'extra': return 'extra';
+      case 'frame-missing': return 'no frame';
+      case 'frame-extra': return 'extra frame';
+      case 'pixel': return '';
+      case 'position': {
+        const r = f.decomp.residual;
+        return [Math.abs(r.dy) >= 2 ? (r.dy > 0 ? '↓' : '↑') + round(Math.abs(r.dy)) : '', Math.abs(r.dx) >= 2 ? (r.dx > 0 ? '→' : '←') + round(Math.abs(r.dx)) : ''].filter(Boolean).join(' ');
+      }
+      case 'size': return f.size && f.size.note ? f.size.note.replace('width ', 'w ').replace('height ', 'h ').replace(/^text /, '').replace(/^glyphs /, '') : 'size';
+      case 'color': return 'ΔE ' + round(f.color.de);
+      case 'shape': return 'shape';
+      default: return '';
+    }
+  }
+
+  let ovSeq = 0;
+  function overlay(box, W, H, side) {
+    const id = 'ov' + (++ovSeq);
+    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': side === 'diff' ? 'Findings drawn over the build' : side === 'design' ? 'Design overlay' : 'Build overlay' });
+    box.append(svg);
+    requestAnimationFrame(() => paintOverlay(svg, W, H, side, id));
+    return svg;
+  }
+  function paintOverlay(svg, W, H, side, id) {
+    if (!svg.isConnected) return;
+    const k = W / Math.max(1, svg.getBoundingClientRect().width);
+    svg.replaceChildren();
+    const defs = sv('defs');
+    for (const [nm, col] of Object.entries({ major: OV.major, minor: OV.minor, ok: OV.ok, design: OV.design })) {
+      defs.append(sv('marker', { id: `${id}-ah-${nm}`, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse', markerUnits: 'userSpaceOnUse' },
+        sv('path', { d: 'M0 0L10 5L0 10Z', fill: col, transform: `scale(${k})`, 'transform-origin': '8 5' })));
+    }
+    svg.append(defs);
+    const res = S.res;
+    if (!res) return;
+    const fam = algoOf(res.r.algo).family;
+    const list = visible();
+    // The build is washed out so overlays read; with the spotlight on, flagged regions are cut
+    // out of both the wash and a dimming layer, so they show at full contrast.
+    if (side === 'diff') {
+      const spot = S.spot && list.some(f => f.level !== 'ok');
+      let maskRef = null;
+      if (spot) {
+        const mask = sv('mask', { id: `${id}-m` }, sv('rect', { x: -10, y: -10, width: W + 20, height: H + 20, fill: '#fff' }));
+        for (const f of list) {
+          if (f.level === 'ok') continue;
+          for (const b of [f.mBox, f.eBox]) {
+            if (!b) continue;
+            const p = 10 * k;
+            mask.append(sv('rect', { x: b.x0 - p, y: b.y0 - p, width: W_(b) + 2 * p, height: H_(b) + 2 * p, rx: 6 * k, fill: '#000' }));
+          }
+        }
+        defs.append(mask);
+        maskRef = `url(#${id}-m)`;
+      }
+      svg.append(sv('rect', { x: 0, y: 0, width: W, height: H, fill: 'rgba(255,255,255,0.5)', mask: maskRef, 'pointer-events': 'none' }));
+      if (spot) svg.append(sv('rect', { x: 0, y: 0, width: W, height: H, fill: 'rgba(15,19,24,0.34)', mask: maskRef, 'pointer-events': 'none' }));
+    }
+    const sorted = list.slice().sort((a, b) => (a.level === 'ok') - (b.level === 'ok') || a.sev - b.sev);
+    const tags = [];
+    for (const f of sorted) {
+      const g = sv('g', { class: 'hit', 'data-fid': f.id });
+      const col = colorOf(f);
+      const isSel = f.id === S.sel;
+      const sw = (f.level === 'major' ? 2.5 : f.level === 'minor' ? 1.75 : 1) + (isSel ? 1 : 0);
+      const R = (b, o = {}) => sv('rect', Object.assign({ class: 'box', x: b.x0, y: b.y0, width: Math.max(1, W_(b)), height: Math.max(1, H_(b)), rx: 3 * k, fill: 'none', stroke: col, 'stroke-width': sw, 'vector-effect': 'non-scaling-stroke' }, o));
+      let anchor = null;
+      if (f.type === 'missing' || f.type === 'frame-missing') {
+        const b = side === 'design' ? f.dBox : (f.eBox || f.dBox);
+        if (side !== 'build' || f.eBox) {
+          g.append(R(b, { fill: 'rgba(0,135,184,0.10)', 'stroke-dasharray': '6 4' }));
+          anchor = b;
+        }
+      } else if (f.type === 'extra' || f.type === 'frame-extra') {
+        if (side !== 'design') { g.append(R(f.mBox, { fill: 'rgba(194,24,122,0.10)', 'stroke-dasharray': '6 4' })); anchor = f.mBox; }
+      } else if (f.type === 'pixel') {
+        const b = f.mBox;
+        g.append(R(b, { stroke: col, 'stroke-width': 1.25, fill: 'none' }));
+        anchor = b;
+      } else {
+        const b = side === 'design' ? f.dBox : f.mBox;
+        const ok = f.level === 'ok';
+        if (side === 'diff' && !ok && f.eBox && (Math.abs(f.decomp.residual.dx) >= 2 || Math.abs(f.decomp.residual.dy) >= 2 || f.issues.includes('size'))) {
+          g.append(R(f.eBox, { stroke: OV.design, 'stroke-width': 1.25, 'stroke-dasharray': '4 3' }));
+          const a = { x: CX(f.eBox), y: CY(f.eBox) }, z = { x: CX(f.mBox), y: CY(f.mBox) };
+          const rr = f.decomp.residual;
+          if (Math.hypot(rr.dx, rr.dy) >= 2 && Math.hypot(z.x - a.x, z.y - a.y) > 6 * k) {
+            g.append(sv('line', { x1: a.x, y1: a.y, x2: z.x, y2: z.y, stroke: col, 'stroke-width': 1.75, 'vector-effect': 'non-scaling-stroke', 'marker-end': `url(#${id}-ah-${f.level})` }));
+          }
+        }
+        g.append(R(b, { fill: ok ? 'none' : (f.level === 'major' ? 'rgba(208,59,59,0.12)' : 'rgba(227,148,0,0.12)'), 'stroke-opacity': ok ? 0.65 : 1 }));
+        anchor = ok ? null : b;
+      }
+      if (isSel && anchor) g.append(R(GROWk(anchor, 5 * k), { stroke: OV.sel, 'stroke-width': 1.5, 'stroke-dasharray': '2 3', fill: 'none' }));
+      g.append(sv('title', null, `${f.title} · ${f.name}`));
+      g.addEventListener('click', ev => { ev.stopPropagation(); select(f.id, true); });
+      g.addEventListener('mouseenter', () => linkHover(f.id, true));
+      g.addEventListener('mouseleave', () => linkHover(f.id, false));
+      svg.append(g);
+      if (anchor && (f.level === 'major' || isSel || (f.level === 'minor' && fam === 'box')) && side !== 'design') {
+        const t = shortTag(f);
+        if (t) tags.push({ f, t, b: anchor, col });
+      }
+    }
+    // constant-size tags, nudged so they don't stack on each other
+    const placed = [];
+    for (const { f, t, b, col } of tags) {
+      const fs = 11 * k, w = (t.length * 6.9 + 10) * k, h = 17 * k;
+      let x = clamp(b.x0, 0, W - w), y = b.y0 - h - 3 * k;
+      if (y < 0) y = b.y1 + 3 * k;
+      for (let tries = 0; tries < 6 && placed.some(p => x < p.x + p.w && x + w > p.x && y < p.y + p.h && y + h > p.y); tries++) y += h + 2 * k;
+      placed.push({ x, y, w, h });
+      const g = sv('g', { 'pointer-events': 'none' },
+        sv('rect', { x, y, width: w, height: h, rx: 3 * k, fill: col }),
+        sv('text', { x: x + 5 * k, y: y + 12.2 * k, 'font-size': fs, 'font-family': 'JetBrains Mono, ui-monospace, Menlo, monospace', 'font-weight': 600, fill: '#fff' }, t));
+      svg.append(g);
+    }
+  }
+  function GROWk(b, p) { return { x0: b.x0 - p, y0: b.y0 - p, x1: b.x1 + p, y1: b.y1 + p }; }
+  function linkHover(fid, on) {
+    for (const g of document.querySelectorAll(`#mat g[data-fid="${fid}"]`)) g.classList.toggle('hl', on);
+  }
+
+  function renderStage() {
+    const mat = $('#mat');
+    mat.replaceChildren();
+    if (S.err) {
+      mat.append(el('div', { class: 'err' }, el('b', { text: 'Could not render this pair. ' }), S.err,
+        el('div', { style: { marginTop: '6px', color: 'var(--ink-2)', fontSize: '12.5px' } }, 'Inline external images and fonts as data URIs, or upload a PNG screenshot of the build instead.')));
+      renderLegend();
+      return;
+    }
+    if (!S.res) { mat.append(el('div', { class: 'empty', text: 'Rendering…' })); return; }
+    const fn = { diff: viewDiff, side: viewSide, plates: viewPlates, swipe: viewSwipe, segments: viewSegments }[S.view] || viewDiff;
+    fn(mat);
+    renderLegend();
+  }
+  function viewDiff(mat) {
+    const { W, H, M, r } = S.res;
+    const { fr, box } = frameEl(W, H, 'Build, with findings', OV.build);
+    box.append(baseCanvas(M.img, 0));
+    if (r.heat) box.append(el('div', { class: 'layer' }, heatCanvas(r.heat)));
+    overlay(box, W, H, 'diff');
+    mat.append(el('div', { class: 'frames' }, fr));
+  }
+  function heatCanvas(hm) {
+    if (hm.canvas) return hm.canvas;
+    const c = document.createElement('canvas'); c.width = hm.W; c.height = hm.H;
+    const x = c.getContext('2d'), id = x.createImageData(hm.W, hm.H), o = id.data;
+    for (let i = 0; i < hm.v.length; i++) {
+      if (!hm.flag[i]) continue;
+      const v = clamp(hm.v[i] * 2.2, 0.25, 1);
+      o[i * 4] = 208; o[i * 4 + 1] = 59 + (1 - v) * 90; o[i * 4 + 2] = 59; o[i * 4 + 3] = 70 + 170 * v;
+    }
+    x.putImageData(id, 0, 0);
+    hm.canvas = c;
+    return c;
+  }
+  function viewSide(mat) {
+    const { W, H, D, M } = S.res;
+    const a = frameEl(W, H, 'Design', OV.design, 2), b = frameEl(W, H, 'Build', OV.build, 2);
+    a.box.append(baseCanvas(D.img, 0.25)); b.box.append(baseCanvas(M.img, 0.25));
+    overlay(a.box, W, H, 'design'); overlay(b.box, W, H, 'build');
+    mat.append(el('div', { class: 'frames two' }, a.fr, b.fr));
+  }
+  function viewPlates(mat) {
+    const { W, H, D, M, d, m } = S.res;
+    const k = `${d.id}|${m.id}|full`;
+    if (!C.plates.has(k)) C.plates.set(k, plates(D.img, M.img, 1));
+    const { fr, box } = frameEl(W, H, 'Cyan prints the design, magenta the build; where both print, ink goes black', OV.ink);
+    box.append(cloneCanvas(C.plates.get(k)));
+    mat.append(el('div', { class: 'frames' }, fr));
+  }
+  function viewSwipe(mat) {
+    const { W, H, D, M } = S.res;
+    const { fr, box } = frameEl(W, H, null, null);
+    const top = el('div', { class: 'layer', style: { clipPath: `inset(0 ${100 - S.swipe}% 0 0)` } }, baseCanvas(D.img, 0));
+    box.append(baseCanvas(M.img, 0), top, sv('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none' },
+      sv('line', { x1: W * S.swipe / 100, x2: W * S.swipe / 100, y1: 0, y2: H, stroke: OV.ink, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke' })));
+    const range = el('input', { type: 'range', min: 0, max: 100, value: S.swipe, id: 'swipeRange', 'aria-label': 'Swipe position' });
+    range.addEventListener('input', () => {
+      S.swipe = +range.value;
+      top.style.clipPath = `inset(0 ${100 - S.swipe}% 0 0)`;
+      const ln = box.querySelector('svg line');
+      ln.setAttribute('x1', W * S.swipe / 100); ln.setAttribute('x2', W * S.swipe / 100);
+    });
+    mat.append(el('div', { class: 'swipe' }, el('span', { text: '◂ design' }), range, el('span', { text: 'build ▸' })), el('div', { class: 'frames' }, fr));
+  }
+  function viewSegments(mat) {
+    const { W, H, D, M } = S.res;
+    const a = frameEl(W, H, `Design · ${D.seg.stats.nodes} nodes · ${round(D.seg.stats.ms)} ms`, OV.design, 2);
+    const b = frameEl(W, H, `Build · ${M.seg.stats.nodes} nodes · ${round(M.seg.stats.ms)} ms`, OV.build, 2);
+    a.box.append(baseCanvas(D.img, 0.55)); b.box.append(baseCanvas(M.img, 0.55));
+    for (const [fb, seg] of [[a.box, D.seg], [b.box, M.seg]]) {
+      const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none' });
+      const walk = (n) => {
+        for (const c of n.children) {
+          const col = KIND_COLORS[c.kind] || OV.ink;
+          const g = sv('g', { class: 'hit' },
+            sv('rect', { class: 'box', x: c.box.x0, y: c.box.y0, width: W_(c.box), height: H_(c.box), fill: c.kind === 'text' ? 'rgba(235,104,52,0.10)' : 'none', stroke: col, 'stroke-width': c.kind === 'container' ? 1.5 : 1, 'vector-effect': 'non-scaling-stroke' }),
+            sv('title', null, `${E.nodeName(c)} · depth ${c.depth}${c.color ? ' · ' + E.color.hex(c.color) : ''}`));
+          svg.append(g);
+          walk(c);
+        }
+      };
+      walk(seg.root);
+      fb.append(svg);
+    }
+    mat.append(el('div', { class: 'frames two' }, a.fr, b.fr));
+  }
+  function renderLegend() {
+    const L = $('#legend');
+    const item = (txt, col, dash, fill) => el('span', null, el('i', { class: dash ? 'dash' : '', style: { borderColor: col, background: fill || 'transparent' } }), txt);
+    if (!S.res && !S.err) { L.replaceChildren(); return; }
+    if (S.view === 'segments') {
+      L.replaceChildren(...Object.entries(KIND_COLORS).map(([k, c]) => item(k[0].toUpperCase() + k.slice(1), c)), el('span', { text: 'Hover a box for its kind, size and depth.' }));
+    } else if (S.view === 'plates' || S.view === 'swipe') {
+      L.replaceChildren(el('span', { text: S.view === 'plates' ? 'Misregistration shows as colored fringes. Fonts fringe everywhere, which is why this view alone cannot rank findings.' : 'Drag the handle to wipe between the design (left) and the build (right).' }));
+    } else {
+      const pix = S.res && algoOf(S.res.r.algo).family === 'pixel';
+      L.replaceChildren(...[
+        item('Major', OV.major, false, 'rgba(208,59,59,0.15)'), item('Minor', OV.minor, false, 'rgba(227,148,0,0.15)'),
+        pix ? item('Differing pixels', OV.major, false, OV.major) : item('Where references put it', OV.design, true),
+        pix ? null : item('Missing from build', OV.design, true, 'rgba(0,135,184,0.12)'), pix ? null : item('Not in design', OV.build, true, 'rgba(194,24,122,0.12)'),
+        S.showOk && !pix ? item('Matched, within tolerance', OV.ok) : null,
+        pix ? el('span', { text: 'Pixel methods report regions, not elements.' }) : el('span', { text: 'Arrows show only the displacement nothing explains.' })].filter(Boolean));
+    }
+  }
+  const ro = new ResizeObserver(() => {
+    clearTimeout(ro.t);
+    ro.t = setTimeout(() => { if (S.res && (S.view === 'diff' || S.view === 'side')) renderStage(); }, 120);
+  });
+  ro.observe($('#mat'));
+
+  /* ---------------- inspector ---------------- */
+  function select(fid, scroll) {
+    S.sel = fid;
+    renderStage();
+    renderInspector();
+    if (scroll) { const it = document.querySelector(`.fitem[data-fid="${fid}"]`); if (it) it.scrollIntoView({ block: 'nearest' }); }
+  }
+  function renderInspector() {
+    const root = $('#insp');
+    const a = algoOf(S.algo);
+    root.replaceChildren(el('div', { class: 'pane-h' }, el('h2', { text: 'Inspector' }), el('span', { class: 'grow' }), el('span', { class: 'tag', text: a.name })));
+    if (S.err) { root.append(el('div', { class: 'empty', text: 'No result for this pair.' })); return; }
+    if (!S.res) { root.append(el('div', { class: 'empty', text: 'Rendering both sides…' })); return; }
+    const { r, ev, flagged, gt } = S.res;
+    const c = r.counts;
+    const pix = a.family === 'pixel';
+    root.append(el('div', { class: 'summary' },
+      el('div', { class: 'score' }, r.score.toFixed(1), el('small', { text: '%' })),
+      el('div', { class: 'counts' },
+        cnt('major', 'Major', c.major), cnt('minor', 'Minor', c.minor),
+        pix ? null : cnt('missing', 'Missing', c.missing), pix ? null : cnt('extra', 'Extra', c.extra),
+        pix ? null : cnt('ok', 'Matched', c.ok)),
+      el('div', { class: 'lab', text: pix ? (r.algo === 'pixel' ? 'Pixels identical' : 'Mean SSIM') : 'Conformance' })));
+    if (ev) {
+      root.append(el('div', { class: 'evalline' },
+        el('span', null, 'Planted bugs found ', el('b', { text: `${ev.found}/${ev.gt}` })), el('span', { text: '·' }),
+        el('span', null, 'False alarms ', el('b', { text: String(ev.fp) })),
+        el('span', { class: 'dots', title: gt.map(g => g.label).join('\n') }, gt.map((g, i) => el('i', { class: ev.hit.has(i) ? 'on' : '', title: g.label })))));
+    } else if (S.res.m.design !== lineage(S.res.d)) {
+      root.append(el('div', { class: 'evalline', text: 'This build was made for a different design, so there is no ground truth for this pairing.' }));
+    }
+    root.append(el('p', { class: 'algo-note' }, el('b', { text: a.name + '. ' }), a.blurb));
+    if (!flagged.length) {
+      root.append(el('div', { class: 'empty' }, el('b', { text: 'Nothing flagged. ' }), pix ? 'No region crosses the threshold.' : `All ${c.ok} matched elements sit within tolerance once parent and flow references are accounted for.`));
+      return;
+    }
+    const ul = el('ul', { class: 'flist', 'aria-label': 'Findings' });
+    for (const f of flagged) {
+      const nm = f.type === 'pixel' ? boxStr(f.mBox) : f.name + (f.decomp ? ` · ${boxStr(f.mBox)}` : f.mBox ? ` · ${boxStr(f.mBox)}` : ` · ${boxStr(f.dBox)}`);
+      ul.append(el('li', null, el('button', {
+        class: 'fitem', type: 'button', 'data-fid': f.id, 'aria-current': String(f.id === S.sel),
+        onclick: () => select(f.id), onmouseenter: () => linkHover(f.id, true), onmouseleave: () => linkHover(f.id, false),
+      }, el('span', { class: 'bar', style: { background: colorOf(f) } }), el('span', { class: 'ttl', text: f.title }), el('span', { class: 'sv', text: f.sev.toFixed(1) }),
+      el('span', { class: 'nm', text: nm }))));
+    }
+    root.append(ul);
+    const f = r.findings.find(x => x.id === S.sel);
+    if (f) root.append(detail(f));
+  }
+  const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+  function cnt(cls, label, n) { return el('span', { class: 'count' }, el('span', { class: 'sw ' + cls }), el('b', { text: String(n) }), label); }
+  function pillFor(f) {
+    const lvl = f.type === 'missing' || f.type === 'frame-missing' ? 'missing' : f.type === 'extra' || f.type === 'frame-extra' ? 'extra' : f.level;
+    return el('span', { class: 'pill' }, el('span', { class: 'sw ' + lvl }), f.level === 'major' ? 'major' : f.level === 'minor' ? 'minor' : 'ok');
+  }
+  function cropCanvas(img, box, col, ghost) {
+    const W = img.width, H = img.height, pad = 22;
+    const focus = ghost ? { x0: Math.min(box.x0, ghost.x0), y0: Math.min(box.y0, ghost.y0), x1: Math.max(box.x1, ghost.x1), y1: Math.max(box.y1, ghost.y1) } : box;
+    const x0 = clamp(Math.floor(focus.x0 - pad), 0, W - 1), y0 = clamp(Math.floor(focus.y0 - pad), 0, H - 1);
+    const x1 = clamp(Math.ceil(focus.x1 + pad), x0 + 1, W), y1 = clamp(Math.ceil(focus.y1 + pad), y0 + 1, H);
+    const s = Math.min(2, 320 / (x1 - x0), 200 / (y1 - y0));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round((x1 - x0) * s)); c.height = Math.max(1, Math.round((y1 - y0) * s));
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(canvasOf(img), x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+    const rr = (b, color, dash) => { x.save(); x.strokeStyle = color; x.lineWidth = 2; if (dash) x.setLineDash([5, 4]); x.strokeRect((b.x0 - x0) * s, (b.y0 - y0) * s, W_(b) * s, H_(b) * s); x.restore(); };
+    if (ghost) rr(ghost, OV.design, true);
+    rr(box, col, false);
+    return c;
+  }
+  function detail(f) {
+    const { D, M } = S.res;
+    const col = colorOf(f);
+    const wrap = el('div', { class: 'detail', 'aria-live': 'polite' });
+    wrap.append(el('div', null, el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } }, pillFor(f), el('h3', { text: f.title })),
+      el('div', { class: 'sub', text: `${f.name}${f.rescued ? ' · paired by the order-free rescue pass' : ''}${f.merged ? ' · 2:1 text merge' : ''}` })));
+    const dc = f.dBox ? el('div', { class: 'crop' }, el('div', { class: 'cap' }, el('i', { style: { background: OV.design } }), 'Design'), cropCanvas(D.img, f.dBox, OV.design))
+      : el('div', { class: 'crop' }, el('div', { class: 'cap' }, el('i', { style: { background: OV.design } }), 'Design'), el('div', { class: 'none', text: 'Not in the design' }));
+    const mc = f.mBox ? el('div', { class: 'crop' }, el('div', { class: 'cap' }, el('i', { style: { background: OV.build } }), 'Build'), cropCanvas(M.img, f.mBox, col, f.decomp && f.level !== 'ok' ? f.eBox : null))
+      : el('div', { class: 'crop' }, el('div', { class: 'cap' }, el('i', { style: { background: OV.build } }), 'Build'),
+        f.eBox ? cropCanvas(M.img, f.eBox, OV.design) : el('div', { class: 'none', text: 'Not found in the build' }));
+    wrap.append(el('div', { class: 'crops' }, dc, mc));
+    if (f.type === 'pixel') {
+      wrap.append(el('p', { class: 'algo-note', style: { margin: 0 }, text: 'Pixel methods have no notion of an element. This region differs, but nothing says whether it is a font, a shift inherited from above, or a real defect.' }));
+      return wrap;
+    }
+    if (f.type === 'missing' || f.type === 'frame-missing') {
+      wrap.append(el('p', { class: 'algo-note', style: { margin: 0 }, text: f.type === 'missing'
+        ? 'No element in the build aligns with this one. The dashed box on the build is where its parent and its predecessor in the flow would put it.'
+        : 'The frame (fill or border) is gone, but its children were found one level up, so they were matched there instead of being charged as missing.' }));
+      return wrap;
+    }
+    if (f.type === 'extra' || f.type === 'frame-extra') {
+      wrap.append(el('p', { class: 'algo-note', style: { margin: 0 }, text: f.type === 'extra'
+        ? 'Present in the build, unmatched in the design. Elements below it that only moved because of it are explained by flowing below it.'
+        : 'The build wraps these children in a frame the design does not have. The children were matched one level up.' }));
+      return wrap;
+    }
+    const dcp = f.decomp;
+    if (dcp) {
+      const row = (label, v, cls) => el('tr', { class: cls || '' }, el('th', { text: label }), el('td', { text: fmt(v.dx) }), el('td', { text: fmt(v.dy) }));
+      wrap.append(el('table', { class: 'dec' },
+        el('caption', { text: 'Displacement of the top-left corner, px' }),
+        el('tr', null, el('th', { text: '' }), el('td', { text: 'x', style: { color: 'var(--muted)' } }), el('td', { text: 'y', style: { color: 'var(--muted)' } })),
+        row('Total, design → build', dcp.abs), row('Inherited from parent', dcp.inherited), row('Explained by references', dcp.explained), row('Charged to this element', dcp.residual, 'charged')));
+      wrap.append(el('div', { class: 'refs' },
+        el('div', null, el('span', { text: '↔' }), el('span', null, 'x explained by ', el('code', { text: dcp.refX }))),
+        el('div', null, el('span', { text: '↕' }), el('span', null, 'y explained by ', el('code', { text: dcp.refY })))));
+    }
+    if (f.size) {
+      const kv = el('dl', { class: 'kv' },
+        el('dt', { text: 'Design box' }), el('dd', { text: boxStr(f.dBox) }),
+        el('dt', { text: 'Build box' }), el('dd', { text: boxStr(f.mBox) }));
+      if (f.size.note) kv.append(el('dt', { text: 'Size' }), el('dd', { text: f.size.note }));
+      if (f.size.explained) kv.append(el('dt', { text: 'Excused' }), el('dd', { text: f.size.explained }));
+      wrap.append(kv);
+    }
+    if (f.color && f.color.d && f.color.m) {
+      wrap.append(el('div', { class: 'swatches' },
+        el('span', null, el('i', { style: { background: E.color.hex(f.color.d) } }), E.color.hex(f.color.d)),
+        el('span', { text: '→' }),
+        el('span', null, el('i', { style: { background: E.color.hex(f.color.m) } }), E.color.hex(f.color.m)),
+        el('span', { text: `ΔE ${f.color.de.toFixed(1)}` })));
+    }
+    if (f.parts) {
+      const max = 4;
+      wrap.append(el('div', { class: 'meters' }, Object.entries(f.parts).map(([k, v]) => el('div', { class: 'meter' },
+        el('span', { text: k }),
+        el('span', { class: 'track' },
+          el('span', { class: 'fill', style: { width: `${clamp(v / max, 0, 1) * 100}%`, background: v >= 2.5 ? OV.major : v >= 1 ? OV.minor : 'var(--muted)' } }),
+          el('span', { class: 'tick', style: { left: `${100 / max}%` } }), el('span', { class: 'tick', style: { left: `${250 / max}%` } })),
+        el('output', { text: v.toFixed(2) })))));
+    }
+    return wrap;
+  }
+
+  /* ---------------- tune & source drawers ---------------- */
+  const SLIDERS = [
+    { h: 'Segmentation' },
+    { k: 'edgeT', label: 'Edge threshold', min: 4, max: 40, step: 1, note: 'Smallest color step (0–255, max channel) that separates two regions.' },
+    { k: 'kH', label: 'Word gap', min: 0.3, max: 2, step: 0.05, note: 'Glyph blobs closer than this × height join one line.' },
+    { k: 'kV', label: 'Line gap', min: 0.15, max: 1.2, step: 0.05, note: 'Lines closer than this × height join one paragraph.' },
+    { h: 'Scoring' },
+    { k: 'posTol', label: 'Position tolerance', min: 2, max: 24, step: 1, unit: 'px', note: 'Unexplained displacement below this is fine. Text gets 1.5×.' },
+    { k: 'textSizeTol', label: 'Text mass tolerance', min: 0.1, max: 1.5, step: 0.05, note: 'Allowed ink-mass change after the page-wide font scale is removed.' },
+    { k: 'colorTol', label: 'Fill color tolerance', min: 4, max: 40, step: 1, unit: 'ΔE', note: 'CIE76 distance between fills before it counts.' },
+    { h: 'Pixel baselines' },
+    { k: 'pixT', label: 'Pixel Δ threshold', min: 8, max: 128, step: 1, note: 'Max-channel difference that flags a pixel.' },
+    { k: 'ssimT', label: 'SSIM threshold', min: 0.3, max: 0.97, step: 0.01, note: 'Local SSIM below this flags a pixel.' },
+  ];
+  function renderTune() {
+    const d = $('#drawerTune');
+    const grid = el('div', { class: 'tune' });
+    for (const s of SLIDERS) {
+      if (s.h) { grid.append(el('h4', { text: s.h })); continue; }
+      const out = el('output', { text: S.P[s.k] + (s.unit ? ' ' + s.unit : '') });
+      const inp = el('input', { type: 'range', id: 'p-' + s.k, min: s.min, max: s.max, step: s.step, value: S.P[s.k] });
+      inp.addEventListener('input', () => { S.P[s.k] = +inp.value; out.textContent = inp.value + (s.unit ? ' ' + s.unit : ''); schedule(); });
+      grid.append(el('div', { class: 'slider' }, el('label', { for: 'p-' + s.k, text: s.label }), out, inp, el('small', { text: s.note })));
+    }
+    const tg = (k, label) => {
+      const i = el('input', { type: 'checkbox', id: 't-' + k });
+      i.checked = !!S.P[k];
+      i.addEventListener('change', () => { S.P[k] = i.checked; schedule(); });
+      return el('label', { for: 't-' + k }, i, label);
+    };
+    grid.append(el('div', { class: 'toggles' },
+      tg('merges', '2:1 text merges'), tg('rescue', 'Order-free rescue pass'), tg('flatten', 'Flatten unmatched frames'),
+      el('button', { class: 'btn ghost', type: 'button', onclick: () => { S.P = { ...E.DEFAULTS }; renderTune(); schedule(); } }, 'Reset to defaults')));
+    d.replaceChildren(grid);
+  }
+  let schedT = null;
+  function schedule() { clearTimeout(schedT); schedT = setTimeout(() => compute({ keepSel: true }), 220); }
+  function renderSource() {
+    const d = $('#drawerSource');
+    const de = designOf(S.designId), me = implOf(S.implId);
+    const side = (it, label, kind) => {
+      if (it.kind === 'image') return el('div', null, el('div', { class: 'lbl', text: label }), el('p', { class: 'hint', text: 'This input is an image, so there is no source to edit.' }));
+      const ta = el('textarea', { id: 'src-' + kind, spellcheck: 'false', 'aria-label': label });
+      ta.value = it.src;
+      const apply = el('button', { class: 'btn solid', type: 'button' }, 'Render edits');
+      apply.addEventListener('click', () => applyEdit(kind, ta.value));
+      return el('div', null, el('div', { class: 'lbl', text: label }), ta,
+        el('div', { class: 'row' }, apply, el('span', { class: 'hint', text: it.builtin ? 'Edits are saved as your own copy; the preset stays intact.' : 'Edits replace this input.' })));
+    };
+    d.replaceChildren(el('div', { class: 'src' }, side(de, `Design · ${de.kind.toUpperCase()}`, 'design'), side(me, `Build · ${me.kind.toUpperCase()}`, 'impl')));
+  }
+  async function applyEdit(kind, text) {
+    try {
+      if (kind === 'design') {
+        const cur = designOf(S.designId);
+        const sz = E.nativeSize({ type: 'svg', text });
+        const s = await sz;
+        const it = cur.builtin ? { id: 'u' + Date.now(), name: cur.name + ' (edited)', kind: 'svg', src: text, w: s.w, h: s.h, origin: cur.id } : Object.assign(cur, { src: text, w: s.w, h: s.h, id: cur.id.split('~')[0] + '~' + Date.now() });
+        if (cur.builtin) S.designs.push(it);
+        S.designId = it.id;
+      } else {
+        const cur = implOf(S.implId);
+        const it = cur.builtin ? { id: 'u' + Date.now(), name: cur.name + ' (edited)', kind: cur.kind, src: text, design: cur.design, missing: cur.missing }
+          : Object.assign(cur, { src: text, id: cur.id.split('~')[0] + '~' + Date.now() });
+        if (cur.builtin) S.impls.push(it);
+        S.implId = it.id;
+      }
+      S.presetId = null;
+      saveCustom();
+      toast('Rendered your edits');
+      await compute();
+      renderSource();
+    } catch (e) { toast(e.message || String(e)); }
+  }
+  function toggleDrawer(which) {
+    S.drawer = S.drawer === which ? null : which;
+    $('#drawerTune').hidden = S.drawer !== 'tune';
+    $('#drawerSource').hidden = S.drawer !== 'source';
+    $('#btnTune').setAttribute('aria-pressed', String(S.drawer === 'tune'));
+    $('#btnSource').setAttribute('aria-pressed', String(S.drawer === 'source'));
+    if (S.drawer === 'tune') renderTune();
+    if (S.drawer === 'source') renderSource();
+  }
+  $('#btnTune').addEventListener('click', () => toggleDrawer('tune'));
+  $('#btnSource').addEventListener('click', () => toggleDrawer('source'));
+
+  /* ---------------- add your own ---------------- */
+  function openAdd() {
+    const root = $('#modalRoot');
+    let fileData = null, fileKind = null;
+    const msg = el('div', { class: 'msg', role: 'status' });
+    const name = el('input', { type: 'text', id: 'addName', placeholder: 'e.g. Checkout, v2 build' });
+    const ta = el('textarea', { id: 'addText', spellcheck: 'false', placeholder: '<svg …> for a design, <html …> or <div …> for a build' });
+    const rD = el('input', { type: 'radio', name: 'addKind', id: 'addKindD', value: 'design' }), rM = el('input', { type: 'radio', name: 'addKind', id: 'addKindM', value: 'impl' });
+    rM.checked = true;
+    const file = el('input', { type: 'file', id: 'addFile', accept: '.svg,.html,.htm,.png,.jpg,.jpeg,.webp,image/*,text/html,image/svg+xml' });
+    file.addEventListener('change', () => {
+      const f = file.files[0];
+      if (!f) return;
+      if (!name.value) name.value = f.name.replace(/\.[^.]+$/, '');
+      const rd = new FileReader();
+      if (f.type.startsWith('image/') && !f.type.includes('svg')) {
+        rd.onload = () => { fileData = rd.result; fileKind = 'image'; ta.value = ''; ta.placeholder = `${f.name} loaded as an image`; };
+        rd.readAsDataURL(f);
+      } else {
+        rd.onload = () => { fileData = null; fileKind = null; ta.value = rd.result; };
+        rd.readAsText(f);
+      }
+    });
+    const close = () => root.replaceChildren();
+    const add = async () => {
+      msg.textContent = '';
+      const asDesign = rD.checked;
+      let kind = fileKind, src = fileData;
+      if (!src) {
+        src = ta.value.trim();
+        if (!src) { msg.textContent = 'Paste markup or choose a file first.'; return; }
+        kind = /^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(src) ? 'svg' : 'html';
+      }
+      if (asDesign && kind === 'html') { msg.textContent = 'A design needs to be an SVG or an image, since it defines the frame size. Add HTML as a build instead.'; return; }
+      const id = 'u' + Date.now();
+      const nm = name.value.trim() || (asDesign ? 'My design' : 'My build');
+      try {
+        if (asDesign) {
+          const s = await E.nativeSize(kind === 'image' ? { type: 'image', url: src } : { type: 'svg', text: src });
+          S.designs.push({ id, name: nm, kind, src, w: s.w, h: s.h });
+          S.designId = id;
+          if (!S.impls.some(m => m.design === id)) { /* keep the current build for a mix-and-match first look */ }
+        } else {
+          S.impls.push({ id, name: nm, kind, src, design: lineage(designOf(S.designId)) });
+          S.implId = id;
+        }
+        S.presetId = null;
+        saveCustom();
+        close();
+        toast(`Added “${nm}”`);
+        compute();
+      } catch (e) { msg.textContent = e.message || String(e); }
+    };
+    root.replaceChildren(el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'addTitle', onclick: e => { if (e.target.classList.contains('modal')) close(); } },
+      el('div', { class: 'card' },
+        el('h3', { id: 'addTitle', text: 'Add a design or a build' }),
+        el('p', { text: 'Designs are SVG exports or PNGs and set the frame size. Builds can be HTML, SVG or a PNG screenshot and are rendered at the design’s frame size. External images and web fonts do not load inside this renderer; inline them as data URIs, or upload a screenshot.' }),
+        el('div', { class: 'radios' }, el('label', { for: 'addKindD' }, rD, 'Design'), el('label', { for: 'addKindM' }, rM, 'Build')),
+        el('label', { for: 'addName', class: 'lbl', text: 'Name' }), name,
+        el('label', { for: 'addText', class: 'lbl', text: 'Paste markup' }), ta,
+        el('label', { class: 'file', for: 'addFile' }, 'Or choose a file ', file),
+        msg,
+        el('div', { class: 'row' }, el('button', { class: 'btn', type: 'button', onclick: close }, 'Cancel'), el('button', { class: 'btn solid', type: 'button', onclick: add }, 'Add and compare')))));
+    name.focus();
+  }
+  $('#btnAdd').addEventListener('click', openAdd);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modalRoot').firstChild) $('#modalRoot').replaceChildren(); });
+  function toast(t) {
+    const n = el('div', { class: 'toast', role: 'status', text: t });
+    document.body.append(n);
+    setTimeout(() => n.remove(), 2600);
+  }
+
+  /* ---------------- benchmark ---------------- */
+  let benchToken = 0;
+  async function runBench() {
+    const my = ++benchToken;
+    const pairs = S.impls.filter(m => m.builtin).map(m => ({ m, d: designOf(m.design) }));
+    S.bench = { rows: [], running: true, total: pairs.length };
+    renderBench();
+    for (const { m, d } of pairs) {
+      const [D, M] = await Promise.all([prepared(d, d.w, d.h), prepared(m, d.w, d.h)]);
+      const gt = (await groundTruth(m, d)) || [];
+      const row = { m, d, gt, cells: {} };
+      for (const a of E.ALGOS) {
+        await idle();
+        if (my !== benchToken) return;
+        const r = E.run(a.id, D.seg, M.seg, D.img, M.img, S.P);
+        row.cells[a.id] = E.evaluate(r.findings, gt);
+      }
+      S.bench.rows.push(row);
+      renderBench();
+    }
+    S.bench.running = false;
+    renderBench();
+  }
+  $('#btnBench').addEventListener('click', runBench);
+  function renderBench() {
+    const st = $('#benchStatus'), T = $('#matrix'), bars = $('#bars');
+    if (!S.bench) { st.textContent = ''; return; }
+    const B = S.bench;
+    st.textContent = B.running ? `Scoring ${B.rows.length + 1} of ${B.total}…` : `${B.rows.length} pairs × ${E.ALGOS.length} algorithms`;
+    const maxFp = Math.max(1, ...B.rows.flatMap(r => Object.values(r.cells).map(c => c.fp)));
+    const head = el('thead', null, el('tr', null, el('th', { text: 'Design · build' }), E.ALGOS.map(a => el('th', { text: a.name }))));
+    const body = el('tbody');
+    for (const row of B.rows) {
+      body.append(el('tr', null,
+        el('th', null, cap(row.m.name.replace(/^[^·]+· /, '')), el('small', { text: `${row.d.name} · ${row.gt.length ? row.gt.length + ' planted' : 'clean'}` })),
+        E.ALGOS.map(a => {
+          const c = row.cells[a.id];
+          const cur = S.res && S.res.m.id === row.m.id && S.res.d.id === row.d.id && S.algo === a.id;
+          return el('td', null, el('button', {
+            class: 'cell' + (c.fp === 0 ? ' zero' : ''), type: 'button', 'aria-current': String(!!cur),
+            title: `${a.name} on ${row.m.name}: found ${c.found} of ${c.gt}, ${c.fp} false alarm${c.fp === 1 ? '' : 's'}`,
+            onclick: () => { Object.assign(S, { designId: row.d.id, implId: row.m.id, algo: a.id, presetId: null }); compute(); document.querySelector('.stage').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+          }, el('span', { class: 'dots' }, c.gt ? Array.from({ length: c.gt }, (_, i) => el('i', { class: i < c.found ? 'on' : '' })) : el('em', { text: 'no bugs planted' })),
+          el('span', { class: 'fp' }, el('span', { class: 't' }, el('span', { style: { width: `${(c.fp / maxFp) * 100}%` } })), el('span', null, el('b', { text: String(c.fp) }), ' FA'))));
+        })));
+    }
+    const tot = a => B.rows.reduce((s, r) => ({ found: s.found + r.cells[a].found, gt: s.gt + r.cells[a].gt, fp: s.fp + r.cells[a].fp, flagged: s.flagged + r.cells[a].flagged }), { found: 0, gt: 0, fp: 0, flagged: 0 });
+    const foot = el('tfoot', null, el('tr', null, el('th', { text: 'All pairs' }), E.ALGOS.map(a => {
+      const t = tot(a.id);
+      return el('td', { class: 'mono', text: `${t.found}/${t.gt} found · ${t.fp} FA` });
+    })));
+    T.replaceChildren(head, body, foot);
+    const totals = E.ALGOS.map(a => ({ a, t: tot(a.id) }));
+    const mx = Math.max(1, ...totals.map(x => x.t.fp));
+    bars.replaceChildren(el('h3', { text: 'False alarms summed over every pair (lower is better), with planted bugs found. The tree columns change one thing at a time: hierarchical matching, then ordered alignment, then flow attribution.' }),
+      ...totals.map(({ a, t }) => el('div', { class: 'barrow' },
+        el('span', { class: 'nm' }, el('b', { text: a.name }), ` · ${t.found}/${t.gt}`),
+        el('span', { class: 'track' },
+          el('span', { class: 'b' + (a.id === S.algo ? ' me' : ''), style: { width: `calc((100% - 52px) * ${(t.fp / mx).toFixed(4)})` } }),
+          el('span', { class: 'v', text: String(t.fp) })))));
+  }
+  function markBenchCell() { /* rendered as part of renderBench */ }
+
+  /* ---------------- boot ---------------- */
+  renderControls();
+  renderGallery();
+  renderInspector();
+  const fromHash = (location.hash || '').slice(1);
+  if (PR.gallery.some(p => p.id === fromHash)) loadPreset(fromHash, false);
+  else loadPreset(S.presetId, false);
+  (async () => {
+    await new Promise(r => setTimeout(r, 300));
+    await drawThumbs();
+    await runBench();
+  })();
+})();
+
+</script>
+
+</body></html>
