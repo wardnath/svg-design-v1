@@ -1,4 +1,4 @@
-ç/* =====================================================================
+/* =====================================================================
    Redline engine — layout registration from pixels only.
    Both sides are rasterized; nothing below ever reads the DOM of the
    implementation. Segmentation → containment tree → per-level alignment

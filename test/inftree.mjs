@@ -1,0 +1,21 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+import fs from 'fs';
+const [,, dId, sx = '1.25', sy = '1.25', depth = '2'] = process.argv;
+const browser = await chromium.launch();
+const page = await browser.newPage();
+page.on('pageerror', e => console.log('[pageerror]', e.message));
+await page.goto('file:///home/claude/redline-v2_4/test/harness.html');
+const out = await page.evaluate(async ([dId, sx, sy, depth]) => {
+  const d = Presets.DESIGNS.find(x => x.id === dId);
+  const W = Math.round(d.w * sx), H = Math.round(d.h * sy);
+  const d0 = await Engine.rasterize({ type: 'svg', text: d.render({ W: d.w, H: d.h }) }, d.w, d.h);
+  const s0 = Engine.segment(d0);
+  const st = Engine.inferStretch(s0, W, H);
+  const di = Engine.synthesize(s0, d0, st.boxes, W, H);
+  const auto = await Engine.rasterize({ type: 'svg', text: d.render({ W, H }) }, W, H);
+  const f = b => [b.x0, b.y0, b.x1, b.y1].map(Math.round).join(',');
+  const dump = (seg, withMode) => { const L = []; const walk = (n, dep) => { if (dep > depth) return; for (const c of n.children) { L.push('  '.repeat(dep) + `${c.kind}${c.cell ? '(cell)' : ''} [${f(c.box)}]` + (withMode && st.boxes.get(c) ? ` → [${f(st.boxes.get(c))}] ${JSON.stringify(st.modes.get(c))}` : '')); walk(c, dep + 1); } }; walk(seg.root, 0); return L.join('\n'); };
+  return '== 1x with inferred placement\n' + dump(s0, true) + '\n== synthesized\n' + dump(Engine.segment(di)) + '\n== auto\n' + dump(Engine.segment(auto));
+}, [dId, +sx, +sy, +depth]);
+console.log(out);
+await browser.close();

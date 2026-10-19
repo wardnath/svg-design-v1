@@ -1,0 +1,93 @@
+<title>Redline Diff Inspector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/*__CSS__*/
+</style>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <g fill="none" stroke-width="1.6">
+          <g stroke="var(--plate-d)"><circle cx="16" cy="16" r="9"/><circle cx="16" cy="16" r="4.2"/><path d="M16 2v28M2 16h28"/></g>
+          <g stroke="var(--plate-m)" opacity="0.9"><circle cx="18.2" cy="18.2" r="9"/><circle cx="18.2" cy="18.2" r="4.2"/><path d="M18.2 4.2v28M4.2 18.2h28"/></g>
+        </g>
+      </svg>
+      <div><h1>Redline</h1><p>design ⟷ build, compared as pixels</p></div>
+    </div>
+    <span class="spacer"></span>
+    <p class="note">Both sides are rasterized, segmented into a containment tree, aligned level by level, and every displacement is charged to exactly one element. No algorithm reads the build’s DOM.</p>
+  </header>
+
+  <section class="controls" aria-label="What to compare">
+    <label class="field"><span>Design</span><span class="sel"><i style="background:var(--plate-d)"></i><select id="selDesign" aria-label="Design"></select></span></label>
+    <label class="field"><span>Build</span><span class="sel"><i style="background:var(--plate-m)"></i><select id="selImpl" aria-label="Build"></select></span></label>
+    <div class="field"><span>Algorithm</span><div class="chips" id="algoChips" role="group" aria-label="Algorithm"></div></div>
+    <div class="ctl-end">
+      <button class="btn" id="btnTune" type="button" aria-pressed="false">Tune</button>
+      <button class="btn" id="btnSource" type="button" aria-pressed="false">Source</button>
+      <button class="btn solid" id="btnAdd" type="button">Add your own</button>
+    </div>
+  </section>
+  <section class="drawer" id="drawerTune" hidden aria-label="Parameters"></section>
+  <section class="drawer" id="drawerSource" hidden aria-label="Source"></section>
+
+  <main class="bench">
+    <aside class="pane rail" aria-label="Presets">
+      <div class="pane-h"><h2>Presets</h2></div>
+      <div class="list" id="gallery"></div>
+      <div class="foot">Each preset is a design, a build and an algorithm. Use the selectors above to pair any design with any build.</div>
+    </aside>
+    <section class="pane stage" aria-label="Stage">
+      <div class="pane-h">
+        <div class="views" id="views" role="group" aria-label="View">
+          <button type="button" data-view="diff" aria-pressed="true">Diff</button>
+          <button type="button" data-view="side" aria-pressed="false">Side by side</button>
+          <button type="button" data-view="plates" aria-pressed="false">Plates</button>
+          <button type="button" data-view="swipe" aria-pressed="false">Swipe</button>
+          <button type="button" data-view="segments" aria-pressed="false">Segments</button>
+        </div>
+        <span class="grow"></span>
+        <label class="opt" for="optSpot"><input type="checkbox" id="optSpot" checked> Spotlight</label>
+        <label class="opt" for="optOk"><input type="checkbox" id="optOk"> Show matched</label>
+        <span class="busy" id="busy" aria-hidden="true"></span>
+      </div>
+      <div class="mat" id="mat"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+    <aside class="pane insp" id="insp" aria-label="Inspector"></aside>
+  </main>
+
+  <section class="section" aria-labelledby="benchTitle">
+    <div class="section-h">
+      <h2 id="benchTitle">Benchmark</h2>
+      <p>Every preset build against its design, through every algorithm. A finding is a hit when it overlaps a planted bug; anything else is a false alarm (FA). Dots are planted bugs, filled when found. Click a cell to inspect it.</p>
+      <span class="grow"></span>
+      <span class="bench-status" id="benchStatus"></span>
+      <button class="btn" id="btnBench" type="button">Re-run with current settings</button>
+    </div>
+    <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <section class="section" aria-labelledby="methodTitle">
+    <div class="section-h"><h2 id="methodTitle">How the full method works</h2></div>
+    <div class="method">
+      <div class="step"><div class="n">1 · rasterize</div><h3>Both sides become pixels</h3><p>The design SVG is drawn to a canvas as an image. The build HTML goes through an SVG <code>foreignObject</code>, so the browser lays it out and paints it, and the algorithms only ever receive the RGBA buffer. A PNG screenshot from Playwright enters the same way.</p></div>
+      <div class="step"><div class="n">2 · segment</div><h3>Pixels become a containment tree</h3><p>Edges are color steps above a threshold, from 1- and 2-pixel stencils so anti-aliased corners still close. Edge components and the regions between them form an alternating graph; a breadth-first walk from the frame border yields nesting. Closed components with a large hole are frames; the rest is ink, grouped into lines by gap/height ratio and into paragraphs by line spacing.</p></div>
+      <div class="step"><div class="n">3 · align</div><h3>Viterbi per level, inside matched parents</h3><p>Children are put in XY-cut reading order and aligned by a first-order Viterbi pass. Emission compares kind, size and color, with text measured against the page’s estimated font scale. Transitions are free when displacement is consistent or a gap to the previous match is preserved, and a skipped element may close its gap. Skips, 2:1 text merges and an order-free rescue pass cover missing, extra and swapped elements.</p></div>
+      <div class="step"><div class="n">4 · attribute</div><h3>Each displacement is charged once</h3><p>An element can be explained by its parent’s edges or center, the sibling it flows after or before, a sibling it was aligned with in the design, or a gap a missing sibling left. Each reference is an edge weighted by the residual it leaves; Chu–Liu/Edmonds picks the minimum arborescence rooted at the parent, so a cascade lands on its first element and two siblings can’t excuse each other. Rows and columns form flow chains anchored at the end that moved least, and a changed gap inside a chain can’t be explained away from the far side. Heights may follow content; text is compared by ink mass, so reflow is free.</p></div>
+    </div>
+  </section>
+</div>
+<div id="modalRoot"></div>
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+/*__PRESETS__*/
+</script>
+<script>
+/*__APP__*/
+</script>
